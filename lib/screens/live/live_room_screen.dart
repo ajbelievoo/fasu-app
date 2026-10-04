@@ -655,6 +655,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   StreamSubscription<void>? _reconnectSub;
   final _viewers = <ViewerEntry>[];
   final _recentlyRemovedViewers = <String, DateTime>{};
+  // Bumped on every roster mutation so the open viewers sheet re-reads the
+  // live list instead of the stale open-time snapshot.
+  final ValueNotifier<int> _viewersVersion = ValueNotifier<int>(0);
 
   /// Every known id for the host. The backend roster can carry the host
   /// under their User `_id` while `widget.liveUser.userId` is the liveUserId
@@ -4329,6 +4332,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             _recentlyRemovedViewers.remove(v.userId);
             _viewerCount = _viewers.length;
           });
+          _viewersVersion.value++;
         } else {
           setState(() => _viewerCount++);
         }
@@ -4366,6 +4370,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             _viewers.removeWhere((v) => v.userId == userId);
             _viewerCount = _viewers.length;
           });
+          _viewersVersion.value++;
           _markViewerRemoved(userId);
         } else if ((userId ?? '').isEmpty) {
           // Backend sent a count-only signal; decrement viewer count.
@@ -4480,6 +4485,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             _viewers.removeWhere((v) => leaverIds.contains(v.userId));
             _viewerCount = _viewers.length;
           });
+          _viewersVersion.value++;
           for (final lid in leaverIds) {
             _markViewerRemoved(lid);
           }
@@ -4592,6 +4598,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             // (id mismatch, stale parse, recently-removed guards).
             _viewerCount = serverViewerCount ?? _viewers.length;
           });
+        _viewersVersion.value++;
           // Native uses view arg1 for joiner entrance effects (entrySvga etc.)
           // — feed it here too; the overlay dedupes against the join comment.
           // Leave markers (isLeave) were already applied as removals above.
@@ -5117,7 +5124,13 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                 .where(
                   (h) =>
                       !_isSelfId(h['userId']?.toString()) &&
-                      !rosterIds.contains(h['userId']?.toString()),
+                      !rosterIds.contains(h['userId']?.toString()) &&
+                      // A guest whose Agora stream is still live was
+                      // roster-missed, not removed — pruning them here made
+                      // seats vanish on host/audience screens after every
+                      // mute/camera roster rebroadcast while their audio
+                      // kept playing.
+                      !_coHostControllers.containsKey(_coHostAgoraUid(h)),
                 )
                 .toList();
         if (stale.isNotEmpty && mounted) {
@@ -7884,7 +7897,14 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         );
         return;
       }
-      map['agoraUid'] = agoraUid;
+      // A roster rebroadcast can carry a stale/zero uid — never clobber a
+      // uid that is already bound to a live stream (it orphans the tile).
+      final boundUid =
+          _coHosts
+              .where((h) => h['userId'] == userId)
+              .map(_coHostAgoraUid)
+              .firstWhere((u) => u > 0, orElse: () => 0);
+      map['agoraUid'] = agoraUid > 0 ? agoraUid : boundUid;
       map['userId'] = userId;
       map['name'] ??=
           nestedUser is Map
@@ -13088,6 +13108,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       viewers: _viewers,
       isHost: widget.isHost,
       onViewerTap: _onViewerTap,
+      rosterVersion: _viewersVersion,
     );
   }
 

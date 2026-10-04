@@ -9,6 +9,7 @@
 /// - `BottomSheetInboxChatList` â€” pick a chat conversation to share a link
 library live_moderation;
 
+import 'package:flutter/foundation.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -445,6 +446,7 @@ void showViewersSheet(
   int? viewerCount,
   Set<String>? adminUserIds,
   String? hostUserId,
+  ValueListenable<int>? rosterVersion,
 }) {
   showModalBottomSheet(
     context: context,
@@ -458,6 +460,7 @@ void showViewersSheet(
           viewerCount: viewerCount,
           adminUserIds: adminUserIds,
           hostUserId: hostUserId,
+          rosterVersion: rosterVersion,
         ),
   );
 }
@@ -468,11 +471,13 @@ class _ViewersSheet extends StatefulWidget {
     required this.isHost,
     required this.onViewerTap,
     this.viewerCount,
+    this.rosterVersion,
     this.adminUserIds,
     this.hostUserId,
   });
 
   final List<ViewerEntry> viewers;
+  final ValueListenable<int>? rosterVersion;
   final bool isHost;
   final ValueChanged<ViewerEntry> onViewerTap;
   final int? viewerCount;
@@ -496,6 +501,18 @@ class _ViewersSheetState extends State<_ViewersSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final listenable = widget.rosterVersion;
+    // Rebuild the list/count whenever the room roster mutates — the sheet
+    // used to show the open-time snapshot forever (empty "0 online" on host
+    // because the fresh roster reply landed right after opening).
+    if (listenable == null) return _buildSheet(context);
+    return ValueListenableBuilder<int>(
+      valueListenable: listenable,
+      builder: (context, _, __) => _buildSheet(context),
+    );
+  }
+
+  Widget _buildSheet(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppTheme.surface : AppTheme.lightSurface;
 

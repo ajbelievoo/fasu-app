@@ -644,6 +644,9 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   late List<SeatItem> _seats;
   int _viewerCount = 0;
   final _viewers = <ViewerEntry>[];
+  // Bumped on roster mutations so the open viewers sheet re-reads the
+  // live list instead of its open-time snapshot.
+  final ValueNotifier<int> _viewersVersion = ValueNotifier<int>(0);
 
   // Viewers removed by real-time events (lessView / left comment / kicked) are
   // kept here for a few seconds so a stale in-flight `view` snapshot doesn't
@@ -3430,6 +3433,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         }
         _viewerCount = _viewers.length;
       });
+      _viewersVersion.value++;
     });
     // CP/Friend rich room entrance (Bigo-style couple entrance with SVGA +
     // both partner avatars).
@@ -10116,6 +10120,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         });
         _viewerCount = _viewers.length;
       });
+      _viewersVersion.value++;
     } catch (e) {
       Log.e(_tag, 'view parse', e);
     }
@@ -10139,6 +10144,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         }
         _viewerCount = _viewers.length;
       });
+      _viewersVersion.value++;
       return added;
     } catch (_) {
       return false;
@@ -10173,6 +10179,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         _viewerCount = _viewers.length;
         removed = _viewers.length < before;
       });
+      _viewersVersion.value++;
       if (removed && userId != null) _markViewerRemoved(userId);
       return removed;
     } catch (_) {
@@ -12835,6 +12842,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       viewers: _viewers,
       isHost: _amHost,
       viewerCount: _viewerCount,
+      rosterVersion: _viewersVersion,
       adminUserIds:
           _admins.map((a) => a.adminUserId?.id).whereType<String>().toSet(),
       hostUserId: widget.roomUser.liveUserId,
