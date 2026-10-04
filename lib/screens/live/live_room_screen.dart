@@ -4602,7 +4602,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             // (id mismatch, stale parse, recently-removed guards).
             _viewerCount = serverViewerCount ?? _viewers.length;
           });
-        _viewersVersion.value++;
+          _viewersVersion.value++;
           // Native uses view arg1 for joiner entrance effects (entrySvga etc.)
           // — feed it here too; the overlay dedupes against the join comment.
           // Leave markers (isLeave) were already applied as removals above.
@@ -5729,7 +5729,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       final finalScores = _resolveIncomingPkScores(map);
       var winner = parseInt(map['winner'], -1);
       if (winner < 0) {
-        final winnerHostId = parseString(map['winnerHostId']);
+        final winnerHostId = parseString(map['winnerHostId']) ?? '';
         if (winnerHostId.isNotEmpty) {
           if (winnerHostId == _pkConfig?.host1Id) {
             winner = 2;
@@ -7920,11 +7920,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       }
       // A roster rebroadcast can carry a stale/zero uid — never clobber a
       // uid that is already bound to a live stream (it orphans the tile).
-      final boundUid =
-          _coHosts
-              .where((h) => h['userId'] == userId)
-              .map(_coHostAgoraUid)
-              .firstWhere((u) => u > 0, orElse: () => 0);
+      final boundUid = _coHosts
+          .where((h) => h['userId'] == userId)
+          .map(_coHostAgoraUid)
+          .firstWhere((u) => u > 0, orElse: () => 0);
       map['agoraUid'] = agoraUid > 0 ? agoraUid : boundUid;
       map['userId'] = userId;
       map['name'] ??=
