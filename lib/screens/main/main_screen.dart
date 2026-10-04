@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../providers/auth_provider.dart';
 import '../../providers/cp_provider.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/minimized_live_provider.dart';
@@ -54,6 +55,14 @@ class _MainScreenState extends State<MainScreen> {
     _loadNotificationCount();
     _loadAds();
     _loadRelationships();
+    // Background session-user refresh — the splash refresh has a 3s timeout,
+    // so a slow network keeps the stale cached user (VIP state, frame,
+    // wallet) for the whole session. Refresh once on home mount.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<AuthProvider>().refreshUser();
+      }
+    });
     // Show the launch popups after the first frame: notification permission
     // pre-prompt first (once / snoozed 7 days), then the daily check-in card
     // (once per day when a reward is claimable).
@@ -181,10 +190,7 @@ class _MainScreenState extends State<MainScreen> {
                 0xFFFAFAFE,
               ).withValues(alpha: 0.78),
               border: Border(
-                top: BorderSide(
-                  color: AppTheme.hairline(context),
-                  width: 1.2,
-                ),
+                top: BorderSide(color: AppTheme.hairline(context), width: 1.2),
               ),
             ),
             child: SafeArea(
@@ -616,9 +622,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       builder:
           (ctx) => ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(32),
-            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
               child: Container(

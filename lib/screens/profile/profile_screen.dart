@@ -53,6 +53,11 @@ class _ProfileScreenState extends State<ProfileScreen>
     _tabCtrl = TabController(length: 4, vsync: this);
     _loadAgency();
     _loadMedals();
+    // Refresh the cached session user on open — otherwise a stale
+    // "VIP Active"/frame keeps rendering long after the VIP expired.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refresh();
+    });
   }
 
   @override
