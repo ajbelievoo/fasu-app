@@ -37,6 +37,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner> {
   Function? _cancelLuckyCreate;
   Function? _cancelLuckyBroadcast;
   Function? _cancelLuckyClaim;
+  Function? _cancelSocketNotification;
   String? _lastLuckyKey;
   DateTime? _lastLuckyAt;
 
@@ -55,6 +56,10 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner> {
     _cancelLuckyClaim = SocketService.instance.on(
       Const.eventLuckyBagClaim,
       _onLuckyBagClaimed,
+    );
+    _cancelSocketNotification = SocketService.instance.on(
+      'notification',
+      _onSocketNotification,
     );
   }
 
@@ -106,6 +111,32 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner> {
       body: body,
       imageUrl: data['image'] as String?,
       data: data,
+    );
+  }
+
+  /// Backend `createAndSendNotification` socket push — covers system / VIP /
+  /// admin notifications when the FCM push fails or the app is foregrounded
+  /// without a tray banner. Reuses the same dedupe signature as FCM so a
+  /// notification delivered by BOTH channels shows only once.
+  Future<void> _onSocketNotification(dynamic value) async {
+    final payload = _unwrap(value);
+    if (payload == null || !mounted) return;
+    final title = _string(payload, const ['title', 'name']);
+    final body = _string(payload, const ['message', 'body']);
+    if (title.isEmpty && body.isEmpty) return;
+    final type = _string(payload, const ['type', 'actionType']).toUpperCase();
+    final signature = '$type|$title|$body';
+    if (type != Const.notificationChat && type != Const.notificationCall) {
+      if (await PushNotificationService.isDuplicateNotification(signature)) {
+        return;
+      }
+    }
+    if (!mounted) return;
+    _showBanner(
+      title: title,
+      body: body,
+      imageUrl: _string(payload, const ['image', 'imageUrl']),
+      data: payload,
     );
   }
 
@@ -248,6 +279,7 @@ class _InAppNotificationBannerState extends State<InAppNotificationBanner> {
     _cancelLuckyCreate?.call();
     _cancelLuckyBroadcast?.call();
     _cancelLuckyClaim?.call();
+    _cancelSocketNotification?.call();
     _dismiss();
     super.dispose();
   }

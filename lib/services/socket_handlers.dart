@@ -484,6 +484,14 @@ class SocketHandlers {
         _notificationController.add(_unwrapMap(data) ?? <String, dynamic>{});
       }),
     );
+    // Backend `createAndSendNotification` emits a literal 'notification'
+    // event to the user's global room (VIP grants, system announcements,
+    // admin actions). Route it into the inbox stream like the others.
+    _unsubscribers.add(
+      _socket.on('notification', (data) {
+        _notificationController.add(_unwrapMap(data) ?? <String, dynamic>{});
+      }),
+    );
   }
 
   void _subscribeCoinEvents() {
