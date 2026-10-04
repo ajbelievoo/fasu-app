@@ -24,12 +24,17 @@ class AuthProvider extends ChangeNotifier {
       Const.eventUserProfileRefresh,
       _onProfileRefresh,
     );
+    _vipDowngradedUnsub = SocketService.instance.on(
+      Const.eventVipDowngraded,
+      _onVipDowngraded,
+    );
   }
 
   static const String _tag = 'AuthProvider';
   final SessionManager session;
   void Function()? _coinUpdateUnsub;
   void Function()? _profileRefreshUnsub;
+  void Function()? _vipDowngradedUnsub;
   bool _profileRefreshInFlight = false;
 
   User? get user => session.getUser();
@@ -119,10 +124,24 @@ class AuthProvider extends ChangeNotifier {
         .whenComplete(() => _profileRefreshInFlight = false);
   }
 
+  /// `vipDowngraded` fired globally — the cron strips vip fields server-side
+  /// so the cached user must refresh or the app keeps showing "VIP Active"
+  /// (and VIP assets) after expiry.
+  void _onVipDowngraded(dynamic data) {
+    if (!isLoggedIn) return;
+    if (data is Map) {
+      final map = Map<String, dynamic>.from(data);
+      final targetId = (map['userId'] ?? map['_id'])?.toString();
+      if (targetId?.isNotEmpty == true && targetId != userId) return;
+    }
+    _onProfileRefresh(data);
+  }
+
   @override
   void dispose() {
     _coinUpdateUnsub?.call();
     _profileRefreshUnsub?.call();
+    _vipDowngradedUnsub?.call();
     super.dispose();
   }
 
