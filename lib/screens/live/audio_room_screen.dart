@@ -4996,10 +4996,13 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         final map = _unwrapSocketData(data);
         if (map == null) return;
         if (!_isThisRoomEvent(map)) return;
+        // `viewerCount` is the exact server count (host+invisible excluded);
+        // legacy `view` includes the host, so subtract 1 on that path.
+        final vc = map['viewerCount'] as int? ?? int.tryParse('${map['viewerCount']}');
         final view = map['view'] as int?;
-        // Backend total includes the host, so subtract 1 for real viewer count.
-        if (view != null && mounted) {
-          setState(() => _viewerCount = max(0, view - 1));
+        final resolved = vc ?? (view != null ? max(0, view - 1) : null);
+        if (resolved != null && mounted) {
+          setState(() => _viewerCount = resolved);
         }
       } catch (_) {}
     });

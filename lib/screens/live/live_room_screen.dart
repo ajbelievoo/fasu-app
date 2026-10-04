@@ -6065,11 +6065,15 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         if (!_payloadBelongsToCurrentLive(Map<String, dynamic>.from(map))) {
           return;
         }
+        // `viewerCount` is the exact server count (host+invisible excluded);
+        // legacy `view` includes the host, so subtract 1 on that path.
+        final vc = parseInt(map['viewerCount']);
         final view = parseInt(map['view']);
+        final resolved = vc > 0 ? vc : (view > 0 ? max(0, view - 1) : 0);
         // Never let a rejoin ack drop the count below the viewers we
         // already know are inside — some backends send a stale/low `view`.
-        if (view > 0 && mounted) {
-          setState(() => _viewerCount = max(_viewers.length, max(0, view - 1)));
+        if (resolved > 0 && mounted) {
+          setState(() => _viewerCount = max(_viewers.length, resolved));
         }
       } catch (_) {}
     });
