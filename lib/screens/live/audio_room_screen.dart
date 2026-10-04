@@ -582,6 +582,12 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   RtcEngineEventHandler? _rtcEventHandler;
   bool _engineReady = false;
   bool _isJoinedChannel = false;
+  // Set once the normal leave path has emitted lessView/lessParticipated so
+  // dispose() doesn't double-emit. A failed-join pop (e.g. 401) never calls
+  // _cleanupAndLeave — dispose emits the cleanup itself so the viewer row
+  // does not stay `isAdd:true` forever (the socket stays connected, so the
+  // server's disconnect sweep never runs for it).
+  bool _leaveEventsEmitted = false;
   bool? _pendingBroadcastRole;
   bool? _pendingMicEnabled;
   bool _micEnabled = true;
@@ -1820,6 +1826,33 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     FloatingRoomService.instance.hide();
     AudioRoomEngineService.instance.clear();
     _drawAndGuessController?.dispose();
+    // Non-host exit cleanup: emit lessView/lessParticipated if the normal
+    // leave path never ran (join-failure pop, back gesture, etc.) — the
+    // socket outlives this screen so the server-side disconnect sweep
+    // would never clear our view[] row, leaving a permanent ghost entry.
+    if (!_amHost && !_leaveEventsEmitted) {
+      _leaveEventsEmitted = true;
+      try {
+        final uid = SessionManager.instance?.userId ?? '';
+        if (uid.isNotEmpty) {
+          SocketService.instance.emit(Const.eventLessView, {
+            'liveStreamingId': _liveId,
+            'liveUserMongoId': _roomUser.id ?? '',
+            'userId': uid,
+            'name': SessionManager.instance?.userName ?? '',
+            'image': SessionManager.instance?.getUser()?.image ?? '',
+          });
+          SocketService.instance.emit(Const.eventLessParticipated, {
+            'position': _selfPosition,
+            'liveUserMongoId': _roomUser.id ?? '',
+            'liveStreamingId': _liveId,
+            'userId': uid,
+            'removedUserID': uid,
+            'role': 'user',
+          });
+        }
+      } catch (_) {}
+    }
     _leaveAndRelease();
     final myUserId = SessionManager.instance?.userId ?? '';
     if (myUserId.isNotEmpty) HostLiveCache.clearSessionRecorded(myUserId);
@@ -2061,11 +2094,25 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           }
         }
         try {
-          final response = await ApiService.joinAudioRoom(
+          // Audio-room endpoints sit behind userAuth — a missing or wiped
+          // session JWT is the usual cause of join failure (401). Heal it
+          // up front so a stale session doesn't get bounced out.
+          await context.read<AuthProvider>().ensureAuthToken();
+          var response = await ApiService.joinAudioRoom(
             roomId: _liveId,
             userId: session.userId,
             passcode: passcode,
           );
+          if (!response.status) {
+            // The first attempt may have 401'd on a stale token which the
+            // interceptor has now cleared — heal and retry once.
+            await context.read<AuthProvider>().ensureAuthToken();
+            response = await ApiService.joinAudioRoom(
+              roomId: _liveId,
+              userId: session.userId,
+              passcode: passcode,
+            );
+          }
           if (!response.status) throw Exception(response.message);
 
           // Some backend versions return the full room in the join response.
@@ -2853,10 +2900,14 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   }
 
   Future<void> _emitJoinEventsAsync({bool announce = true}) async {
+    if (!mounted) return;
     try {
       final session = context.read<SessionManager>();
       final user = session.getUser();
       final invisible = await VipPrivilegeHelper.shouldJoinInvisible(session);
+      // The post-frame callback can land after a failed-join pop —
+      // emitting addView now would persist a ghost viewer row.
+      if (!mounted) return;
       final liveId = _liveId;
       final liveUserMongoId = _roomUser.id ?? '';
       final hostId = _hostUserId ?? liveUserMongoId;
@@ -12126,6 +12177,8 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         }
       }
     });
+
+    _leaveEventsEmitted = true;
 
     // 1) Emit lessParticipated — clears my seat on all other devices.
     //    Send BOTH position and userId so other clients can match either.
