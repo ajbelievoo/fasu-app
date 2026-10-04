@@ -36,6 +36,7 @@ class AuthProvider extends ChangeNotifier {
   void Function()? _profileRefreshUnsub;
   void Function()? _vipDowngradedUnsub;
   bool _profileRefreshInFlight = false;
+  DateTime _lastSocketProfileRefreshAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   User? get user => session.getUser();
   bool get isLoggedIn => session.isLoggedIn;
@@ -90,11 +91,16 @@ class AuthProvider extends ChangeNotifier {
       final diamond =
           (map['diamond'] as num?)?.toInt() ??
           (map['diamonds'] as num?)?.toInt();
+      final rCoin =
+          (map['rCoin'] as num?)?.toInt() ?? (map['beans'] as num?)?.toInt();
       final u = session.getUser();
       if (u != null) {
         final newCoin = coin ?? u.coin.toInt();
         final newDiamond = diamond ?? u.diamond.toInt();
-        session.saveUser(u.copyWith(coin: newCoin, diamond: newDiamond));
+        final newRCoin = rCoin ?? u.rCoin.toInt();
+        session.saveUser(
+          u.copyWith(coin: newCoin, diamond: newDiamond, rCoin: newRCoin),
+        );
         notifyListeners();
         Log.d(
           _tag,
@@ -105,10 +111,20 @@ class AuthProvider extends ChangeNotifier {
   }
 
   /// Handle `userCoinUpdate` socket event globally.
-  void _onCoinUpdate(dynamic data) => updateUserCoinsFromSocket(data);
+  void _onCoinUpdate(dynamic data) {
+    updateUserCoinsFromSocket(data);
+    // The slim payload only carries balances — piggyback a throttled profile
+    // refetch so beans/VIP/asset fields changed by the same server action
+    // (admin edit, seller transfer, recharge approval) also sync live.
+    _onProfileRefresh(data);
+  }
 
   void _onProfileRefresh(dynamic data) {
     if (!isLoggedIn || _profileRefreshInFlight) return;
+    if (DateTime.now().difference(_lastSocketProfileRefreshAt) <
+        const Duration(seconds: 3)) {
+      return;
+    }
     if (data is Map) {
       final map = Map<String, dynamic>.from(data);
       final targetId =
@@ -116,6 +132,7 @@ class AuthProvider extends ChangeNotifier {
       if (targetId?.isNotEmpty == true && targetId != userId) return;
     }
     _profileRefreshInFlight = true;
+    _lastSocketProfileRefreshAt = DateTime.now();
     refreshUser()
         .catchError((e, s) {
           Log.e(_tag, 'profile refresh socket failed', e, s);
