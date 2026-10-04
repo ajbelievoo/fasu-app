@@ -87,7 +87,8 @@ class VipPrivilegeHelper {
       isVip(s) && (details(s)?.isPremiumThemeEnabled ?? false);
 
   static bool canUseExclusiveThemes(SessionManager s) =>
-      isVip(s) && (details(s)?.isExclusiveProfileThemesAndBackgroundsEnabled ?? false);
+      isVip(s) &&
+      (details(s)?.isExclusiveProfileThemesAndBackgroundsEnabled ?? false);
 
   static bool canUsePremiumEmoji(SessionManager s) =>
       isVip(s) && (details(s)?.isPremiumEmojiAndStickersEnabled ?? false);
@@ -149,31 +150,34 @@ class VipPrivilegeHelper {
         : vd.nameColor;
   }
 
+  /// Store-equipped asset URL for the local user (items bought in the
+  /// store) — the fallback when [VipDetails] has no tier asset for a slot.
+  static String? _store(SessionManager s, String key) =>
+      s.getUser()?.storeAssets?[key];
+
   static String? selfChatBubbleUrl(SessionManager s) =>
-      details(s)?.chatBubbleUrl;
+      details(s)?.chatBubbleUrl ?? _store(s, 'chatBubbleUrl');
 
   static String? selfBadgeUrl(SessionManager s) {
     final vd = details(s);
-    return vd?.levelBadgeUrl;
+    return vd?.levelBadgeUrl ?? _store(s, 'badgeUrl');
   }
 
   static String? selfFrameUrl(SessionManager s) =>
-      details(s)?.profileFrameUrl;
+      details(s)?.profileFrameUrl ?? _store(s, 'avatarFrameImage');
 
   static String? selfEntranceAnimationUrl(SessionManager s) =>
-      details(s)?.entranceAnimationUrl;
+      details(s)?.entranceAnimationUrl ?? _store(s, 'entranceAnimationUrl');
 
   static String? selfVoiceWaveUrl(SessionManager s) =>
-      details(s)?.voiceWaveUrl;
+      details(s)?.voiceWaveUrl ?? _store(s, 'voiceWaveUrl');
 
   static String? selfRoomCardUrl(SessionManager s) =>
-      details(s)?.roomCardUrl;
+      details(s)?.roomCardUrl ?? _store(s, 'roomCardUrl');
 
-  static String? selfNameUrl(SessionManager s) =>
-      details(s)?.nameUrl;
+  static String? selfNameUrl(SessionManager s) => details(s)?.nameUrl;
 
-  static String? selfTagUrl(SessionManager s) =>
-      details(s)?.tagUrl;
+  static String? selfTagUrl(SessionManager s) => details(s)?.tagUrl;
 
   // ---------------------------------------------------------------------------
   // Socket-payload VIP visual extraction
@@ -225,18 +229,24 @@ class VipPrivilegeHelper {
   /// the granular flags (golden name, colored chat, name animation).
   static VipChatStyle chatStyleFromPayload(Map<String, dynamic> map) {
     final vd = _vipDetailsMap(map);
-    final isVip = parseBool(map['isVIP'] ?? map['isVip']) ||
+    final isVip =
+        parseBool(map['isVIP'] ?? map['isVip']) ||
         (map['user'] is Map &&
-            parseBool((map['user'] as Map)['isVIP'] ??
-                (map['user'] as Map)['isVip'])) ||
+            parseBool(
+              (map['user'] as Map)['isVIP'] ?? (map['user'] as Map)['isVip'],
+            )) ||
         vd != null;
-    final nameColor = _str(vd, 'vipNameColor') ?? _str(vd, 'nameColor') ??
+    final nameColor =
+        _str(vd, 'vipNameColor') ??
+        _str(vd, 'nameColor') ??
         _str(vd, 'chatColor');
     return VipChatStyle(
       isVip: isVip,
       nameColorHex: nameColor,
       chatBubbleUrl: _str(vd, 'chatBubbleUrl'),
-      chatBubbleId: parseIntOrNull(_str(vd, 'chatBubbleId') ?? vd?['chatBubbleId']),
+      chatBubbleId: parseIntOrNull(
+        _str(vd, 'chatBubbleId') ?? vd?['chatBubbleId'],
+      ),
       isGoldenName: _flag(vd, 'isGoldenNameEnabled'),
       isColoredChat: _flag(vd, 'isColoredChatEnabled'),
       isNameAnimation: _flag(vd, 'isNameAnimationEnabled'),

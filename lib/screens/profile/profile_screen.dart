@@ -148,12 +148,14 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Prefer user's uploaded cover, then VIP profile background (if VIP).
-    final rawCoverUrl = user?.coverImage?.isNotEmpty == true
-        ? user!.coverImage
-        : (user?.isVIP == true ? user?.profileBackgroundImage : null);
-    final coverUrl = SvgaHelper.isSvgaUrl(rawCoverUrl)
-        ? VideoUtil.getFullSvgaUrl(rawCoverUrl)
-        : VideoUtil.getFullImageUrl(rawCoverUrl);
+    final rawCoverUrl =
+        user?.coverImage?.isNotEmpty == true
+            ? user!.coverImage
+            : (user?.isVIP == true ? user?.profileBackgroundImage : null);
+    final coverUrl =
+        SvgaHelper.isSvgaUrl(rawCoverUrl)
+            ? VideoUtil.getFullSvgaUrl(rawCoverUrl)
+            : VideoUtil.getFullImageUrl(rawCoverUrl);
     final hasCover = coverUrl.isNotEmpty;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(32)),
@@ -162,9 +164,7 @@ class _Header extends StatelessWidget {
         children: [
           // Cover or gradient backdrop with decorative glow blobs
           if (hasCover)
-            Positioned.fill(
-              child: _buildCoverBackground(coverUrl),
-            )
+            Positioned.fill(child: _buildCoverBackground(coverUrl))
           else
             const Positioned.fill(
               child: DecoratedBox(
@@ -259,12 +259,13 @@ class _Header extends StatelessWidget {
   Widget _buildCoverBackground(String coverUrl) {
     if (SvgaHelper.isSvgaUrl(coverUrl)) {
       return LayoutBuilder(
-        builder: (context, constraints) => SvgaPlayer(
-          url: coverUrl,
-          width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          fit: BoxFit.cover,
-        ),
+        builder:
+            (context, constraints) => SvgaPlayer(
+              url: coverUrl,
+              width: constraints.maxWidth,
+              height: constraints.maxHeight,
+              fit: BoxFit.cover,
+            ),
       );
     }
     return CachedNetworkImage(
@@ -384,7 +385,8 @@ class _Header extends StatelessWidget {
               ),
               child: UserAvatar(
                 imageUrl: user?.image,
-                frameUrl: user?.avatarFrameImage,
+                frameUrl:
+                    user?.avatarFrameImage ?? user?.vipDetails?.profileFrameUrl,
                 size: 84,
                 isVerified: user?.isVerified ?? false,
                 isVIP: user?.isVIP ?? false,
@@ -554,7 +556,11 @@ class _Header extends StatelessWidget {
                   color: Colors.white.withValues(alpha: 0.14),
                   shape: BoxShape.circle,
                 ),
-                child: const ImageIcon(AssetImage("assets/gift/official_gift.png"), color: Colors.white, size: 22),
+                child: const ImageIcon(
+                  AssetImage("assets/gift/official_gift.png"),
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
             ],
           ),
@@ -580,24 +586,26 @@ class _Header extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isOnline ? const Color(0xFF34C759) : Colors.white38,
-            boxShadow: isOnline
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFF34C759).withValues(alpha: 0.5),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ]
-                : null,
+            boxShadow:
+                isOnline
+                    ? [
+                      BoxShadow(
+                        color: const Color(0xFF34C759).withValues(alpha: 0.5),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                    : null,
           ),
         ),
         const SizedBox(width: 6),
         Text(
           isOnline ? 'Online' : 'Offline',
           style: TextStyle(
-            color: isOnline
-                ? const Color(0xFF34C759)
-                : Colors.white.withValues(alpha: 0.6),
+            color:
+                isOnline
+                    ? const Color(0xFF34C759)
+                    : Colors.white.withValues(alpha: 0.6),
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -645,7 +653,12 @@ class _Header extends StatelessWidget {
                         child: CachedNetworkImage(
                           imageUrl: medalsToShow[i],
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => const Icon(Icons.shield, size: 16, color: Colors.white24),
+                          errorWidget:
+                              (_, __, ___) => const Icon(
+                                Icons.shield,
+                                size: 16,
+                                color: Colors.white24,
+                              ),
                         ),
                       )
                       : const Icon(
@@ -953,8 +966,11 @@ class _StatsRow extends StatelessWidget {
     );
   }
 
-  Widget _divider(BuildContext context) =>
-      Container(height: 28, width: 1, color: AppTheme.themed(context, 0xFF2E2E3E, 0xFFE8E8F0));
+  Widget _divider(BuildContext context) => Container(
+    height: 28,
+    width: 1,
+    color: AppTheme.themed(context, 0xFF2E2E3E, 0xFFE8E8F0),
+  );
 
   Widget _stat(
     BuildContext context,
@@ -1173,7 +1189,10 @@ class _WalletSection extends StatelessWidget {
   /// Falls back to 'VIP Active' if the user is VIP but no level number
   /// can be determined, so we never show the misleading 'VIP 0'.
   String _resolveVipSubLabel(User? u) {
-    if (u?.isVIP != true && u?.vip?.isActive != true && u?.vipDetails?.isActive != true && u?.vipStatus?.isVip != true) {
+    if (u?.isVIP != true &&
+        u?.vip?.isActive != true &&
+        u?.vipDetails?.isActive != true &&
+        u?.vipStatus?.isVip != true) {
       return 'VIP';
     }
 
@@ -1181,22 +1200,34 @@ class _WalletSection extends StatelessWidget {
 
     // 1. Numeric currentLevel.
     final currentLevel = u?.vipStatus?.currentLevel ?? 0;
-    if (currentLevel > 0 && currentLevel <= maxReasonableVipLevel) return 'VIP $currentLevel';
+    if (currentLevel > 0 && currentLevel <= maxReasonableVipLevel)
+      return 'VIP $currentLevel';
 
     // 2. Numeric tier from vipDetails / vip / nextLevelName (ignore huge IDs).
-    for (final tier in [u?.vipDetails?.tier, u?.vip?.tier, u?.vipStatus?.nextLevelName]) {
+    for (final tier in [
+      u?.vipDetails?.tier,
+      u?.vip?.tier,
+      u?.vipStatus?.nextLevelName,
+    ]) {
       if (tier != null && tier.isNotEmpty) {
         final parsed = int.tryParse(tier);
-        if (parsed != null && parsed > 0 && parsed <= maxReasonableVipLevel) return 'VIP $parsed';
+        if (parsed != null && parsed > 0 && parsed <= maxReasonableVipLevel)
+          return 'VIP $parsed';
       }
     }
 
     // 3. Digits inside tier / level name strings (e.g. 'VIP 1', 'VIP-2').
-    for (final text in [u?.vipDetails?.tier, u?.vip?.tier, u?.vipStatus?.currentLevelName, u?.vipStatus?.nextLevelName]) {
+    for (final text in [
+      u?.vipDetails?.tier,
+      u?.vip?.tier,
+      u?.vipStatus?.currentLevelName,
+      u?.vipStatus?.nextLevelName,
+    ]) {
       if (text?.isNotEmpty != true) continue;
       final digits = RegExp(r'\d+').firstMatch(text!)?.group(0);
       final parsed = digits == null ? null : int.tryParse(digits);
-      if (parsed != null && parsed > 0 && parsed <= maxReasonableVipLevel) return 'VIP $parsed';
+      if (parsed != null && parsed > 0 && parsed <= maxReasonableVipLevel)
+        return 'VIP $parsed';
     }
 
     // 4. VIP is active but no level number is available - don't show 0.
@@ -1269,7 +1300,11 @@ class _TabsSectionState extends State<_TabsSection> {
             TabBar(
               controller: widget.tabCtrl,
               labelColor: const Color(0xFF6A5AE0),
-              unselectedLabelColor: AppTheme.themed(context, 0xFF8A8AA8, 0xFF9A9AB0),
+              unselectedLabelColor: AppTheme.themed(
+                context,
+                0xFF8A8AA8,
+                0xFF9A9AB0,
+              ),
               indicatorColor: const Color(0xFF6A5AE0),
               indicatorSize: TabBarIndicatorSize.label,
               indicatorWeight: 3,
@@ -1392,7 +1427,10 @@ class _TabsSectionState extends State<_TabsSection> {
           child: CachedNetworkImage(
             imageUrl: p.post ?? '',
             fit: BoxFit.cover,
-            placeholder: (_, __) => Container(color: AppTheme.themed(context, 0xFF232332, 0xFFF1F1FA)),
+            placeholder:
+                (_, __) => Container(
+                  color: AppTheme.themed(context, 0xFF232332, 0xFFF1F1FA),
+                ),
             errorWidget:
                 (_, __, ___) => Container(
                   color: AppTheme.themed(context, 0xFF232332, 0xFFF1F1FA),
@@ -1537,7 +1575,9 @@ class _HonorTabState extends State<_HonorTab>
       item['id']?.toString(),
       nested?['_id']?.toString(),
       nested?['id']?.toString(),
-      (item['giftId'] is! Map && item['giftId'] != null) ? item['giftId'].toString() : null,
+      (item['giftId'] is! Map && item['giftId'] != null)
+          ? item['giftId'].toString()
+          : null,
     ];
     for (final c in candidates) {
       if (c?.isNotEmpty == true) return c!;
@@ -1650,7 +1690,11 @@ class _HonorTabState extends State<_HonorTab>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ImageIcon(const AssetImage("assets/gift/official_gift.png"), color: const Color(0xFF6A5AE0).withValues(alpha: 0.25), size: 44),
+            ImageIcon(
+              const AssetImage("assets/gift/official_gift.png"),
+              color: const Color(0xFF6A5AE0).withValues(alpha: 0.25),
+              size: 44,
+            ),
             const SizedBox(height: 8),
             Text(
               emptyMsg,
@@ -1690,7 +1734,11 @@ class _HonorTabState extends State<_HonorTab>
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: _buildGiftMedia(g.image, size: 56, fit: BoxFit.contain),
+                        child: _buildGiftMedia(
+                          g.image,
+                          size: 56,
+                          fit: BoxFit.contain,
+                        ),
                       ),
                     ),
                     // Count badge
@@ -1877,7 +1925,11 @@ class _GiftDetailScreen extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    child: _buildGiftMedia(gift.image, size: 64, fit: BoxFit.contain),
+                    child: _buildGiftMedia(
+                      gift.image,
+                      size: 64,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -2034,7 +2086,11 @@ class _SenderCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         errorWidget:
                             (_, __, ___) => Container(
-                              color: AppTheme.themed(context, 0xFF232332, 0xFFF1F1FA),
+                              color: AppTheme.themed(
+                                context,
+                                0xFF232332,
+                                0xFFF1F1FA,
+                              ),
                               child: Icon(
                                 Icons.person,
                                 color: AppTheme.fg(context, 0.4),
@@ -2096,6 +2152,7 @@ class _SenderCard extends StatelessWidget {
 class _GiftSummary {
   String id;
   final String name;
+
   /// Raw image/SVGA URL as returned by the backend. Callers must resolve it
   /// with [_buildGiftMedia] which handles both image and SVGA playback.
   final String image;
@@ -2110,16 +2167,28 @@ class _GiftSummary {
 
 /// Builds a gift thumbnail widget that handles both static images and SVGA
 /// animations. [rawImage] is the URL as stored in the backend response.
-Widget _buildGiftMedia(String? rawImage, {double size = 56, BoxFit fit = BoxFit.contain}) {
+Widget _buildGiftMedia(
+  String? rawImage, {
+  double size = 56,
+  BoxFit fit = BoxFit.contain,
+}) {
   final url = rawImage?.trim() ?? '';
   if (url.isEmpty) {
-    return ImageIcon(const AssetImage("assets/gift/official_gift.png"), color: const Color(0xFF9A9AB0), size: size * 0.55);
+    return ImageIcon(
+      const AssetImage("assets/gift/official_gift.png"),
+      color: const Color(0xFF9A9AB0),
+      size: size * 0.55,
+    );
   }
 
   if (SvgaHelper.isSvgaUrl(url)) {
     final fullSvga = VideoUtil.getFullSvgaUrl(url);
     if (fullSvga.isEmpty) {
-      return ImageIcon(const AssetImage("assets/gift/official_gift.png"), color: const Color(0xFF9A9AB0), size: size * 0.55);
+      return ImageIcon(
+        const AssetImage("assets/gift/official_gift.png"),
+        color: const Color(0xFF9A9AB0),
+        size: size * 0.55,
+      );
     }
     return SizedBox(
       width: size,
@@ -2130,7 +2199,11 @@ Widget _buildGiftMedia(String? rawImage, {double size = 56, BoxFit fit = BoxFit.
 
   final fullImage = VideoUtil.getFullImageUrl(url);
   if (fullImage.isEmpty) {
-    return ImageIcon(const AssetImage("assets/gift/official_gift.png"), color: const Color(0xFF9A9AB0), size: size * 0.55);
+    return ImageIcon(
+      const AssetImage("assets/gift/official_gift.png"),
+      color: const Color(0xFF9A9AB0),
+      size: size * 0.55,
+    );
   }
 
   return CachedNetworkImage(
@@ -2147,7 +2220,11 @@ Widget _buildGiftMedia(String? rawImage, {double size = 56, BoxFit fit = BoxFit.
           ),
         ),
     errorWidget:
-        (_, __, ___) => ImageIcon(const AssetImage("assets/gift/official_gift.png"), color: const Color(0xFF9A9AB0), size: size * 0.55),
+        (_, __, ___) => ImageIcon(
+          const AssetImage("assets/gift/official_gift.png"),
+          color: const Color(0xFF9A9AB0),
+          size: size * 0.55,
+        ),
   );
 }
 
@@ -2174,73 +2251,53 @@ class _MenuTabContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accountItems = <_MenuItem>[
-      _MenuItem(
-        Icons.account_balance_wallet_rounded,
-        'My Wallet',
-        const [Color(0xFF7B61FF), Color(0xFF4F8DFD)],
-        () => context.pushNamed(AppRoutes.wallet),
-      ),
-      _MenuItem(
-        Icons.storefront_rounded,
-        'My Items',
-        const [Color(0xFFFF6B9D), Color(0xFFE84B8A)],
-        () => context.pushNamed(AppRoutes.myStore),
-      ),
-      _MenuItem(
-        Icons.photo_library_rounded,
-        'My Posts',
-        const [Color(0xFF34C759), Color(0xFF30D158)],
-        () => context.pushNamed(AppRoutes.feedGrid),
-      ),
-      _MenuItem(
-        Icons.subscriptions_rounded,
-        'Subscriptions',
-        const [Color(0xFFFFB800), Color(0xFFFF9500)],
-        () => context.pushNamed(AppRoutes.hostSubscription),
-      ),
-      _MenuItem(
-        Icons.history_rounded,
-        'Transaction',
-        const [Color(0xFF4F8DFD), Color(0xFF3B7BFF)],
-        () => context.pushNamed(AppRoutes.transactionHistory),
-      ),
-      _MenuItem(
-        Icons.redeem_rounded,
-        'Redeem',
-        const [Color(0xFFFF6B9D), Color(0xFFE84B8A)],
-        () => context.pushNamed(AppRoutes.redeemRequests),
-      ),
-      _MenuItem(
-        Icons.verified_user_rounded,
-        'KYC Verify',
-        const [Color(0xFF34C759), Color(0xFF30D158)],
-        () => context.pushNamed(AppRoutes.kyc),
-      ),
+      _MenuItem(Icons.account_balance_wallet_rounded, 'My Wallet', const [
+        Color(0xFF7B61FF),
+        Color(0xFF4F8DFD),
+      ], () => context.pushNamed(AppRoutes.wallet)),
+      _MenuItem(Icons.storefront_rounded, 'My Items', const [
+        Color(0xFFFF6B9D),
+        Color(0xFFE84B8A),
+      ], () => context.pushNamed(AppRoutes.myStore)),
+      _MenuItem(Icons.photo_library_rounded, 'My Posts', const [
+        Color(0xFF34C759),
+        Color(0xFF30D158),
+      ], () => context.pushNamed(AppRoutes.feedGrid)),
+      _MenuItem(Icons.subscriptions_rounded, 'Subscriptions', const [
+        Color(0xFFFFB800),
+        Color(0xFFFF9500),
+      ], () => context.pushNamed(AppRoutes.hostSubscription)),
+      _MenuItem(Icons.history_rounded, 'Transaction', const [
+        Color(0xFF4F8DFD),
+        Color(0xFF3B7BFF),
+      ], () => context.pushNamed(AppRoutes.transactionHistory)),
+      _MenuItem(Icons.redeem_rounded, 'Redeem', const [
+        Color(0xFFFF6B9D),
+        Color(0xFFE84B8A),
+      ], () => context.pushNamed(AppRoutes.redeemRequests)),
+      _MenuItem(Icons.verified_user_rounded, 'KYC Verify', const [
+        Color(0xFF34C759),
+        Color(0xFF30D158),
+      ], () => context.pushNamed(AppRoutes.kyc)),
     ];
 
     final premiumItems = <_MenuItem>[
-      _MenuItem(
-        Icons.workspace_premium_rounded,
-        'VIP Center',
-        const [Color(0xFFFFD700), Color(0xFFFFB800)],
-        () => context.pushNamed(AppRoutes.vip),
-      ),
-      _MenuItem(
-        Icons.trending_up_rounded,
-        'User Level',
-        const [Color(0xFF9B6BFF), Color(0xFF6A5AE0)],
-        () => context.pushNamed(AppRoutes.levels),
-      ),
+      _MenuItem(Icons.workspace_premium_rounded, 'VIP Center', const [
+        Color(0xFFFFD700),
+        Color(0xFFFFB800),
+      ], () => context.pushNamed(AppRoutes.vip)),
+      _MenuItem(Icons.trending_up_rounded, 'User Level', const [
+        Color(0xFF9B6BFF),
+        Color(0xFF6A5AE0),
+      ], () => context.pushNamed(AppRoutes.levels)),
       _MenuItem(Icons.diamond, 'Free Diamonds', const [
         Color(0xFF34C759),
         Color(0xFF30D158),
       ], () => context.pushNamed(AppRoutes.freeCoins)),
-      _MenuItem(
-        Icons.shopping_bag_rounded,
-        'Store',
-        const [Color(0xFF4F8DFD), Color(0xFF3B7BFF)],
-        () => context.pushNamed(AppRoutes.store),
-      ),
+      _MenuItem(Icons.shopping_bag_rounded, 'Store', const [
+        Color(0xFF4F8DFD),
+        Color(0xFF3B7BFF),
+      ], () => context.pushNamed(AppRoutes.store)),
       _MenuItem(Icons.groups_rounded, 'Family', const [
         Color(0xFF7B61FF),
         Color(0xFF6A5AE0),
@@ -2253,49 +2310,37 @@ class _MenuTabContent extends StatelessWidget {
 
     final centerItems = <_MenuItem>[
       if (_showAgencyCenter(user))
-        _MenuItem(
-          Icons.business_rounded,
-          'Agency Center',
-          const [Color(0xFF6A5AE0), Color(0xFF4A3FB8)],
-          () => context.pushNamed(AppRoutes.agency),
-        ),
+        _MenuItem(Icons.business_rounded, 'Agency Center', const [
+          Color(0xFF6A5AE0),
+          Color(0xFF4A3FB8),
+        ], () => context.pushNamed(AppRoutes.agency)),
       // Host Center is intentionally always visible — users without host access
       // can still send a host request from inside the screen.
-      _MenuItem(
-        Icons.mic_rounded,
-        'Host Center',
-        const [Color(0xFFFF6B9D), Color(0xFFE84B8A)],
-        () => context.pushNamed(AppRoutes.hostCenter),
-      ),
+      _MenuItem(Icons.mic_rounded, 'Host Center', const [
+        Color(0xFFFF6B9D),
+        Color(0xFFE84B8A),
+      ], () => context.pushNamed(AppRoutes.hostCenter)),
       if (_showBdCenter(user))
-        _MenuItem(
-          Icons.headset_mic_rounded,
-          'BD Center',
-          const [Color(0xFF4F8DFD), Color(0xFF3B7BFF)],
-          () => context.pushNamed(AppRoutes.bdCenter),
-        ),
+        _MenuItem(Icons.headset_mic_rounded, 'BD Center', const [
+          Color(0xFF4F8DFD),
+          Color(0xFF3B7BFF),
+        ], () => context.pushNamed(AppRoutes.bdCenter)),
       if (_showOfflineRecharge(user))
-        _MenuItem(
-          Icons.diamond_rounded,
-          'Offline Recharge',
-          const [Color(0xFFFFB800), Color(0xFFFF9500)],
-          () => context.pushNamed(AppRoutes.offlineRecharge),
-        ),
+        _MenuItem(Icons.diamond_rounded, 'Offline Recharge', const [
+          Color(0xFFFFB800),
+          Color(0xFFFF9500),
+        ], () => context.pushNamed(AppRoutes.offlineRecharge)),
     ];
 
     final supportItems = <_MenuItem>[
-      _MenuItem(
-        Icons.support_agent_rounded,
-        'Have an Issue',
-        const [Color(0xFF34C759), Color(0xFF30D158)],
-        () => context.pushNamed(AppRoutes.feedback),
-      ),
-      _MenuItem(
-        Icons.inventory_2_rounded,
-        'My Complaints',
-        const [Color(0xFFFF6B9D), Color(0xFFE84B8A)],
-        () => context.pushNamed(AppRoutes.complaintList),
-      ),
+      _MenuItem(Icons.support_agent_rounded, 'Have an Issue', const [
+        Color(0xFF34C759),
+        Color(0xFF30D158),
+      ], () => context.pushNamed(AppRoutes.feedback)),
+      _MenuItem(Icons.inventory_2_rounded, 'My Complaints', const [
+        Color(0xFFFF6B9D),
+        Color(0xFFE84B8A),
+      ], () => context.pushNamed(AppRoutes.complaintList)),
     ];
 
     return DefaultTabController(
@@ -2320,8 +2365,14 @@ class _MenuTabContent extends StatelessWidget {
               dividerColor: Colors.transparent,
               labelColor: Colors.white,
               unselectedLabelColor: AppTheme.fg(context, 0.5),
-              labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              labelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
               padding: const EdgeInsets.all(3),
               tabs: const [
                 Tab(text: 'Account'),
@@ -2336,19 +2387,39 @@ class _MenuTabContent extends StatelessWidget {
               children: [
                 SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: _menuGroup(context, 'Account', accountItems, showTitle: false),
+                  child: _menuGroup(
+                    context,
+                    'Account',
+                    accountItems,
+                    showTitle: false,
+                  ),
                 ),
                 SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: _menuGroup(context, 'Premium', premiumItems, showTitle: false),
+                  child: _menuGroup(
+                    context,
+                    'Premium',
+                    premiumItems,
+                    showTitle: false,
+                  ),
                 ),
                 SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: _menuGroup(context, 'Centers', centerItems, showTitle: false),
+                  child: _menuGroup(
+                    context,
+                    'Centers',
+                    centerItems,
+                    showTitle: false,
+                  ),
                 ),
                 SingleChildScrollView(
                   padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                  child: _menuGroup(context, 'Support', supportItems, showTitle: false),
+                  child: _menuGroup(
+                    context,
+                    'Support',
+                    supportItems,
+                    showTitle: false,
+                  ),
                 ),
               ],
             ),
@@ -2380,7 +2451,12 @@ class _MenuTabContent extends StatelessWidget {
         role.contains('recharge');
   }
 
-  Widget _menuGroup(BuildContext context, String title, List<_MenuItem> items, {bool showTitle = true}) {
+  Widget _menuGroup(
+    BuildContext context,
+    String title,
+    List<_MenuItem> items, {
+    bool showTitle = true,
+  }) {
     // Use the item count as the column count (capped at 4) so single-row
     // groups are evenly distributed and centered instead of being left-aligned.
     final crossAxisCount = items.length.clamp(1, 4);

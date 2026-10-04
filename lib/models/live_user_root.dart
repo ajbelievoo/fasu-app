@@ -1,6 +1,7 @@
 import 'audio_room_root.dart';
 import 'json_annotation_helper.dart';
 import 'pk_call_models.dart';
+import 'user_root.dart';
 
 /// Ported from native `LiveUserRoot.java`.
 ///
@@ -58,6 +59,7 @@ class LiveUser {
     this.createdAt,
     this.time = 0,
     this.avatarFrameImage,
+    this.vipDetails,
     this.seat = const [],
     this.category,
     this.broadcastType,
@@ -69,6 +71,10 @@ class LiveUser {
   final String? username;
   final String? image;
   final String? avatarFrameImage;
+
+  /// Host's VIP tier payload persisted on the liveUser doc — carries
+  /// profileFrameUrl/chatBubbleUrl/roomCardUrl plus merged store assets.
+  final VipDetails? vipDetails;
   final String? country;
   final String? countryFlagImage;
   final num diamond;
@@ -111,91 +117,106 @@ class LiveUser {
   /// Public room id — same as `live_stream_root.dart` LiveUser.
   String? get liveRoomId => liveStreamingId ?? id;
 
-  factory LiveUser.fromJson(Map<String, dynamic> json) => LiveUser(
-    id: parseString(json['_id'] ?? json['id']),
-    name: parseString(
-      json['name'] ??
-          (json['userId'] is Map ? json['userId']['name'] : null) ??
-          (json['user'] is Map ? json['user']['name'] : null),
-    ),
-    username: parseString(
-      json['username'] ??
-          (json['userId'] is Map ? json['userId']['username'] : null) ??
-          (json['user'] is Map ? json['user']['username'] : null),
-    ),
-    image: parseString(
-      json['image'] ??
-          json['userImage'] ??
-          (json['userId'] is Map ? json['userId']['image'] : null) ??
-          (json['user'] is Map ? json['user']['image'] : null),
-    ),
-    country: parseString(json['country']),
-    countryFlagImage: parseString(json['countryFlagImage']),
-    diamond: parseNum(json['diamond'], 0),
-    view: parseInt(
-      json['view'] ??
-          json['viewerCount'] ??
-          json['viewersCount'] ??
-          json['viewCount'] ??
-          json['totalView'] ??
-          json['views'],
-      0,
-    ),
-    rCoin: parseInt(json['rCoin'], 0),
-    channel: parseString(
-      json['channel'] ?? json['channelName'] ?? json['agoraChannel'],
-    ),
-    isVIP: parseBool(json['isVIP'] ?? json['isVip'] ?? json['vip']),
-    token: parseString(json['token']),
-    service: parseString(json['service']),
-    livekitUrl: parseString(json['livekitUrl']),
-    livekitToken: parseString(json['livekitToken']),
-    livekitRoom: parseString(json['livekitRoom']),
-    liveStreamingType: parseString(
-      json['liveStreamingType'] ?? json['liveType'],
-    ),
-    isFake: parseBool(json['isFake']),
-    isHostExists: parseBool(json['isHostExists'], true),
-    isAudio:
-        parseBool(json['audio'] ?? json['isAudio']) ||
-        (parseString(
-              json['liveType'] ?? json['liveStreamingType'],
-            )?.toLowerCase() ==
-            'audio'),
-    isPkMode: parseBool(json['isPkMode']),
-    pkConfig:
-        json['pkConfig'] is Map
-            ? PkConfig.fromJson(
-              Map<String, dynamic>.from(json['pkConfig'] as Map),
+  factory LiveUser.fromJson(Map<String, dynamic> json) {
+    final vd =
+        json['vipDetails'] is Map
+            ? VipDetails.fromJson(
+              Map<String, dynamic>.from(json['vipDetails'] as Map),
             )
-            : null,
-    roomName: parseString(json['roomName']),
-    roomImage: parseString(json['roomImage']),
-    roomWelcome: parseString(json['roomWelcome']),
-    liveUserId: parseString(
-      json['liveUserId'] ??
-          (json['userId'] is Map
-              ? (json['userId']['_id'] ?? json['userId']['id'])
-              : json['userId']) ??
-          (json['user'] is Map
-              ? (json['user']['_id'] ?? json['user']['id'])
-              : null),
-    ),
-    liveStreamingId: parseString(
-      json['liveStreamingId'] ?? json['_id'] ?? json['id'],
-    ),
-    link: parseString(json['link']),
-    agoraUID: parseInt(json['agoraUID'] ?? json['agoraUid'] ?? json['uid'], 0),
-    uniqueId: parseString(json['uniqueId']),
-    createdAt: parseString(json['createdAt']),
-    time: parseInt(json['time'], 0),
-    avatarFrameImage: parseString(json['avatarFrameImage']),
-    seat: parseList(json['seat'] ?? json['seats'], SeatItem.fromJson),
-    category: parseString(json['category']),
-    broadcastType: parseString(json['broadcastType'] ?? json['broadcast_type']),
-    musicPermission:
-        parseString(json['musicPermission'])?.toLowerCase() ?? 'host',
-  );
+            : null;
+    return LiveUser(
+      id: parseString(json['_id'] ?? json['id']),
+      name: parseString(
+        json['name'] ??
+            (json['userId'] is Map ? json['userId']['name'] : null) ??
+            (json['user'] is Map ? json['user']['name'] : null),
+      ),
+      username: parseString(
+        json['username'] ??
+            (json['userId'] is Map ? json['userId']['username'] : null) ??
+            (json['user'] is Map ? json['user']['username'] : null),
+      ),
+      image: parseString(
+        json['image'] ??
+            json['userImage'] ??
+            (json['userId'] is Map ? json['userId']['image'] : null) ??
+            (json['user'] is Map ? json['user']['image'] : null),
+      ),
+      country: parseString(json['country']),
+      countryFlagImage: parseString(json['countryFlagImage']),
+      diamond: parseNum(json['diamond'], 0),
+      view: parseInt(
+        json['view'] ??
+            json['viewerCount'] ??
+            json['viewersCount'] ??
+            json['viewCount'] ??
+            json['totalView'] ??
+            json['views'],
+        0,
+      ),
+      rCoin: parseInt(json['rCoin'], 0),
+      channel: parseString(
+        json['channel'] ?? json['channelName'] ?? json['agoraChannel'],
+      ),
+      isVIP: parseBool(json['isVIP'] ?? json['isVip'] ?? json['vip']),
+      token: parseString(json['token']),
+      service: parseString(json['service']),
+      livekitUrl: parseString(json['livekitUrl']),
+      livekitToken: parseString(json['livekitToken']),
+      livekitRoom: parseString(json['livekitRoom']),
+      liveStreamingType: parseString(
+        json['liveStreamingType'] ?? json['liveType'],
+      ),
+      isFake: parseBool(json['isFake']),
+      isHostExists: parseBool(json['isHostExists'], true),
+      isAudio:
+          parseBool(json['audio'] ?? json['isAudio']) ||
+          (parseString(
+                json['liveType'] ?? json['liveStreamingType'],
+              )?.toLowerCase() ==
+              'audio'),
+      isPkMode: parseBool(json['isPkMode']),
+      pkConfig:
+          json['pkConfig'] is Map
+              ? PkConfig.fromJson(
+                Map<String, dynamic>.from(json['pkConfig'] as Map),
+              )
+              : null,
+      roomName: parseString(json['roomName']),
+      roomImage: parseString(json['roomImage']),
+      roomWelcome: parseString(json['roomWelcome']),
+      liveUserId: parseString(
+        json['liveUserId'] ??
+            (json['userId'] is Map
+                ? (json['userId']['_id'] ?? json['userId']['id'])
+                : json['userId']) ??
+            (json['user'] is Map
+                ? (json['user']['_id'] ?? json['user']['id'])
+                : null),
+      ),
+      liveStreamingId: parseString(
+        json['liveStreamingId'] ?? json['_id'] ?? json['id'],
+      ),
+      link: parseString(json['link']),
+      agoraUID: parseInt(
+        json['agoraUID'] ?? json['agoraUid'] ?? json['uid'],
+        0,
+      ),
+      uniqueId: parseString(json['uniqueId']),
+      createdAt: parseString(json['createdAt']),
+      time: parseInt(json['time'], 0),
+      avatarFrameImage:
+          parseString(json['avatarFrameImage']) ?? vd?.profileFrameUrl,
+      vipDetails: vd,
+      seat: parseList(json['seat'] ?? json['seats'], SeatItem.fromJson),
+      category: parseString(json['category']),
+      broadcastType: parseString(
+        json['broadcastType'] ?? json['broadcast_type'],
+      ),
+      musicPermission:
+          parseString(json['musicPermission'])?.toLowerCase() ?? 'host',
+    ); // closes LiveUser(
+  }
 
   Map<String, dynamic> toJson() => {
     '_id': id,
@@ -207,6 +228,7 @@ class LiveUser {
     'image': image,
     'userImage': image,
     'avatarFrameImage': avatarFrameImage,
+    'vipDetails': vipDetails?.toJson(),
     'country': country,
     'countryFlagImage': countryFlagImage,
     'roomName': roomName,

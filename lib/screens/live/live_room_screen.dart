@@ -6931,6 +6931,14 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             coHost['country'] ??= hit['country'];
             coHost['isMute'] = parseBool(hit['isMute']);
             coHost['isCameraOff'] = parseBool(hit['isCameraOff']);
+            coHost['avatarFrame'] ??=
+                hit['avatarFrame'] ?? hit['avatarFrameImage'];
+            coHost['avatarFrameImage'] ??=
+                hit['avatarFrameImage'] ?? hit['avatarFrame'];
+            coHost['vipDetails'] ??= hit['vipDetails'];
+            if (hit['isVIP'] != null) {
+              coHost['isVIP'] = parseBool(hit['isVIP']);
+            }
           }
         } else {
           _fetchRoomRequested();
@@ -6984,7 +6992,12 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
           coHost['name'] = r['name'] ?? r['userName'] ?? r['username'];
         }
         coHost['image'] ??= r['image'] ?? r['userImage'] ?? r['avatar'];
-        coHost['avatarFrame'] ??= r['avatarFrame'] ?? r['frameUrl'];
+        coHost['avatarFrame'] ??=
+            r['avatarFrame'] ?? r['avatarFrameImage'] ?? r['frameUrl'];
+        coHost['avatarFrameImage'] ??=
+            r['avatarFrameImage'] ?? r['avatarFrame'] ?? r['frameUrl'];
+        coHost['vipDetails'] ??= r['vipDetails'];
+        if (r['isVIP'] != null) coHost['isVIP'] = parseBool(r['isVIP']);
         if ((coHost['name']?.toString().isNotEmpty ?? false) &&
             (coHost['image']?.toString().isNotEmpty ?? false)) {
           return;
@@ -7001,6 +7014,12 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       }
       if (!hasImage && (info['image']?.isNotEmpty ?? false)) {
         coHost['image'] = info['image'];
+        changed = true;
+      }
+      if ((coHost['avatarFrame']?.toString().isNotEmpty ?? false) == false &&
+          (info['avatarFrame']?.isNotEmpty ?? false)) {
+        coHost['avatarFrame'] = info['avatarFrame'];
+        coHost['avatarFrameImage'] = info['avatarFrame'];
         changed = true;
       }
       // Orphan tiles are also hydrated from inside _buildCoHostGrid, so the
@@ -7031,9 +7050,19 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                   : (u?.username?.isNotEmpty ?? false)
                   ? u!.username
                   : u?.uniqueId;
+          final resolvedFrame =
+              (u?.avatarFrameImage?.isNotEmpty ?? false)
+                  ? u!.avatarFrameImage
+                  : u?.vipDetails?.profileFrameUrl;
           // Cache even misses so repeated builds don't refetch forever.
           _coHostProfileCache[userId] =
-              u != null ? {'name': resolvedName, 'image': u.image} : const {};
+              u != null
+                  ? {
+                    'name': resolvedName,
+                    'image': u.image,
+                    'avatarFrame': resolvedFrame,
+                  }
+                  : const {};
           if (u != null) apply(_coHostProfileCache[userId]!);
         })
         .catchError((Object e) {
@@ -7443,6 +7472,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     final name = user?.name ?? session.userName;
     final image = user?.image ?? session.userImage;
     _myJoinRequestSent = true;
+    final frameUrl =
+        user?.avatarFrameImage ?? user?.vipDetails?.profileFrameUrl;
     SocketService.instance.emit(Const.eventAddRequestedCallJoin, {
       'userId': session.userId,
       'liveStreamingId': widget.liveUser.liveRoomId,
@@ -7454,6 +7485,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       'isMute': false,
       'isCameraOff': false,
       'isVIP': user?.isVIP ?? false,
+      if (frameUrl != null && frameUrl.isNotEmpty) 'avatarFrame': frameUrl,
+      if (frameUrl != null && frameUrl.isNotEmpty) 'avatarFrameImage': frameUrl,
       if (user?.vipDetails != null) 'vipDetails': user!.vipDetails!.toJson(),
     });
     // Mirror native: show the join request in the comment list with type 'callRequest'.
@@ -8084,6 +8117,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     _myCallInviteAccepted = true;
     final session = context.read<SessionManager>();
     final user = context.read<AuthProvider>().user;
+    final frameUrl =
+        user?.avatarFrameImage ?? user?.vipDetails?.profileFrameUrl;
     final coHostData = {
       'userId': session.userId,
       'liveStreamingId': widget.liveUser.liveRoomId,
@@ -8099,6 +8134,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       'type': 'user',
       'isVIP': user?.isVIP ?? false,
       'isCameraOff': false,
+      if (frameUrl != null && frameUrl.isNotEmpty) 'avatarFrame': frameUrl,
+      if (frameUrl != null && frameUrl.isNotEmpty) 'avatarFrameImage': frameUrl,
+      if (user?.vipDetails != null) 'vipDetails': user!.vipDetails!.toJson(),
     };
 
     // Switch to broadcaster immediately so the local co-host video shows
@@ -12741,7 +12779,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         coHost['avatarFrameImage']?.toString() ??
         coHost['frameUrl']?.toString() ??
         coHost['profileFrameUrl']?.toString() ??
-        coHost['vipDetails']?['profileFrameUrl']?.toString();
+        (coHost['vipDetails'] is Map
+            ? (coHost['vipDetails'] as Map)['profileFrameUrl']?.toString()
+            : null) ??
+        cachedIdentity?['avatarFrame']?.toString();
     final roomCardUrl =
         coHost['vipDetails']?['roomCardUrl']?.toString() ??
         coHost['vipDetails']?['backgroundImage']?.toString() ??

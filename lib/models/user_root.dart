@@ -118,6 +118,7 @@ class User {
     this.familyBadgeUrl,
     this.familyImage,
     this.avatarFrameImage,
+    this.storeAssets,
     this.vipBadgeUrl,
     this.vipChatColor,
     this.vipBackgroundImage,
@@ -237,6 +238,15 @@ class User {
   /// Family logo image URL.
   final String? familyImage;
   final String? avatarFrameImage;
+
+  /// URLs of store-equipped visual items (avatar frame, chat bubble,
+  /// room card, mic wave, room theme, entry effect, badge) resolved from
+  /// the populated `avatarFrame`/`chatBubble`/`roomCard`/`micWave`/
+  /// `roomTheme`/`entryEffect`/`badge` refs on the user doc — or from a
+  /// server-supplied `storeAssets` map in socket payloads. Keys:
+  /// avatarFrameImage, chatBubbleUrl, roomCardUrl, voiceWaveUrl,
+  /// roomThemeUrl, entranceAnimationUrl, badgeUrl.
+  final Map<String, String>? storeAssets;
   final String? vipBadgeUrl;
   final String? vipChatColor;
   final String? vipBackgroundImage;
@@ -429,6 +439,7 @@ class User {
                 : null),
       ),
       vipBadgeUrl: parseString(json['vipBadgeUrl']),
+      storeAssets: _parseStoreAssets(json),
       vipChatColor: parseString(json['vipChatColor']),
       vipBackgroundImage: parseString(json['vipBackgroundImage']),
       profileBackgroundImage: parseString(json['profileBackgroundImage']),
@@ -521,6 +532,39 @@ class User {
     return null;
   }
 
+  /// Extracts store-equipped item URLs from populated store refs on the
+  /// user doc (`chatBubble`/`roomCard`/`micWave`/`roomTheme`/`entryEffect`/
+  /// `badge` StoreItem objects) plus a server `storeAssets` map.
+  static Map<String, String>? _parseStoreAssets(Map<String, dynamic> json) {
+    String? img(dynamic v) {
+      if (v is Map) return parseString(v['image'] ?? v['thumbnail']);
+      if (v is String && v.isNotEmpty) return v;
+      return null;
+    }
+
+    final candidates = <String, String?>{
+      'avatarFrameImage':
+          parseString(json['avatarFrameImage']) ?? img(json['avatarFrame']),
+      'chatBubbleUrl': img(json['chatBubble']),
+      'roomCardUrl': img(json['roomCard']),
+      'voiceWaveUrl': img(json['micWave']),
+      'roomThemeUrl': img(json['roomTheme']),
+      'entranceAnimationUrl': img(json['entryEffect']),
+      'badgeUrl': img(json['badge']),
+    };
+    final m = <String, String>{};
+    candidates.forEach((k, v) {
+      if (v != null && v.isNotEmpty) m[k] = v;
+    });
+    final sa = json['storeAssets'];
+    if (sa is Map) {
+      sa.forEach((k, v) {
+        if (v is String && v.isNotEmpty) m[k] = v;
+      });
+    }
+    return m.isEmpty ? null : m;
+  }
+
   static List<Channel>? _asChannels(dynamic raw) {
     if (raw is List) {
       return raw
@@ -610,6 +654,7 @@ class User {
     'familyBadgeUrl': familyBadgeUrl,
     'familyImage': familyImage,
     'avatarFrameImage': avatarFrameImage,
+    'storeAssets': storeAssets,
     'vipBadgeUrl': vipBadgeUrl,
     'vipChatColor': vipChatColor,
     'vipBackgroundImage': vipBackgroundImage,
@@ -668,6 +713,7 @@ class User {
     List<String>? medals,
     List<String>? achievements,
     String? avatarFrameImage,
+    Map<String, String>? storeAssets,
   }) {
     return User(
       id: id,
@@ -746,6 +792,7 @@ class User {
       familyBadgeUrl: familyBadgeUrl,
       familyImage: familyImage,
       avatarFrameImage: avatarFrameImage ?? this.avatarFrameImage,
+      storeAssets: storeAssets ?? this.storeAssets,
       vipBadgeUrl: vipBadgeUrl,
       vipChatColor: vipChatColor,
       vipBackgroundImage: vipBackgroundImage,
