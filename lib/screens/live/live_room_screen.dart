@@ -1982,12 +1982,16 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                   if (mounted &&
                       _isPkActive &&
                       _pkRemoteAgoraUid == remoteUid) {
-                    _leavePkBattle(reason: 'disconnect', notifyOpponent: false);
+                    // notifyOpponent: the pkEnd broadcast must still reach OUR
+                    // room — the surviving host's audience resets only when the
+                    // backend relays pkEnd (they'd sit in a frozen PK until the
+                    // server ticker times out otherwise).
+                    _leavePkBattle(reason: 'disconnect', notifyOpponent: true);
                   }
                 });
               } else {
                 Log.i(_tag, 'PK opponent $remoteUid quit, leaving PK battle');
-                _leavePkBattle(reason: 'disconnect', notifyOpponent: false);
+                _leavePkBattle(reason: 'disconnect', notifyOpponent: true);
               }
             } else {
               setState(() => _pkRemoteController = null);
@@ -5719,16 +5723,33 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         return;
       }
 
-      // Determine final winner from server payload or current scores.
-      final serverWinner = parseInt(map['winner'], -1);
+      // Determine final winner — prefer the server's canonical winnerHostId
+      // (the `winner` field is the winner's details OBJECT, not an int), then
+      // an explicit isWinner number, then score comparison as last resort.
       final finalScores = _resolveIncomingPkScores(map);
-      var winner =
-          serverWinner >= 0
-              ? serverWinner
-              : pkWinnerFromScores(
-                host1Score: finalScores.host1,
-                host2Score: finalScores.host2,
-              );
+      var winner = parseInt(map['winner'], -1);
+      if (winner < 0) {
+        final winnerHostId = parseString(map['winnerHostId']);
+        if (winnerHostId.isNotEmpty) {
+          if (winnerHostId == _pkConfig?.host1Id) {
+            winner = 2;
+          } else if (winnerHostId == _pkConfig?.host2Id) {
+            winner = 1;
+          }
+        }
+      }
+      if (winner < 0) {
+        final doc = map['data'];
+        if (doc is Map) {
+          winner = parseInt(doc['pkConfig']?['isWinner'], -1);
+        }
+      }
+      if (winner < 0) {
+        winner = pkWinnerFromScores(
+          host1Score: finalScores.host1,
+          host2Score: finalScores.host2,
+        );
+      }
 
       _recordPkRound(
         _pkRoundCount + 1,
@@ -11631,11 +11652,18 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       _engine.leaveChannel();
     } catch (_) {}
 
-    // If PK was active, emit pkEnd
+    // If PK was active, emit pkEnd — the backend resolves the session via
+    // pkId/liveStreamingId, but include the host ids too (same payload as
+    // _leavePk) so every consumer path resolves it.
     if (_isPkActive) {
       try {
         SocketService.instance.emit(Const.eventPkEnd, {
           'liveStreamingId': liveId,
+          'pkId': _pkConfig?.pkId,
+          'host1Id': _pkConfig?.host1Id,
+          'host2Id': _pkConfig?.host2Id,
+          'host1LiveId': _pkConfig?.host1LiveId,
+          'host2LiveId': _pkConfig?.host2LiveId,
           'winner': 0,
           'reason': 'host_ended',
         });

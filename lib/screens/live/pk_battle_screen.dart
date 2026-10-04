@@ -197,7 +197,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
     _secondsRemaining =
         _isPunishmentRound
             ? (_punishmentDuration > 0 ? _punishmentDuration : 60)
-            : _battleDuration;
+            : _serverRemainingSeconds();
     // Apply network latency compensation to initial timer
     if (_secondsRemaining > 0) {
       _secondsRemaining = (_secondsRemaining - _networkLatencyMs ~/ 1000).clamp(
@@ -717,7 +717,11 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
       _hasVoted = false;
       _host1Score = 0;
       _host2Score = 0;
-      setState(() => _secondsRemaining = config.durationSeconds);
+      final startRemaining =
+          _config.secondsLeft > 0
+              ? _config.secondsLeft
+              : _remainingFromEndTime() ?? config.durationSeconds;
+      setState(() => _secondsRemaining = startRemaining);
       _resolveViewerVideoUids();
       _startCountdown();
     });
@@ -792,6 +796,17 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
       setState(() {
         _host1Score = scores.host1;
         _host2Score = scores.host2;
+        // The server broadcasts its authoritative clock with every score
+        // update — snap the local countdown back when drift exceeds 2s so a
+        // late joiner / throttled timer still shows the real remaining time.
+        final serverLeft =
+            (map['secondsLeft'] as num?)?.toInt() ??
+            _secondsLeftFromMapEndTime(map);
+        if (!_isPunishmentRound &&
+            serverLeft != null &&
+            (serverLeft - _secondsRemaining).abs() > 2) {
+          _secondsRemaining = serverLeft.clamp(0, _battleDuration);
+        }
       });
     });
 
@@ -868,7 +883,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
         setState(() {
           _host1Score = 0;
           _host2Score = 0;
-          _secondsRemaining = _battleDuration;
+          _secondsRemaining = _serverRemainingSeconds();
           _isPunishmentRound = false;
         });
         _resolveViewerVideoUids();
@@ -892,7 +907,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
         setState(() {
           _host1Score = 0;
           _host2Score = 0;
-          _secondsRemaining = _battleDuration;
+          _secondsRemaining = _serverRemainingSeconds();
           _isPunishmentRound = false;
         });
         _resolveViewerVideoUids();
@@ -1137,6 +1152,10 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
       pkAutoStartBlocked: incoming.pkAutoStartBlocked,
       showStartButton: incoming.showStartButton,
       punishmentTask: pick(incoming.punishmentTask, old.punishmentTask),
+      startTime: pick(incoming.startTime, old.startTime),
+      endTime: pick(incoming.endTime, old.endTime),
+      secondsLeft:
+          incoming.secondsLeft > 0 ? incoming.secondsLeft : old.secondsLeft,
     );
   }
 
@@ -1327,6 +1346,28 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
     final list = map.values.toList();
     list.sort((a, b) => b.amount.compareTo(a.amount));
     return list.take(limit).toList();
+  }
+
+  /// Server-authoritative remaining battle seconds: secondsLeft wins, then
+  /// an endTime-derived countdown, then the full duration (fresh battle).
+  int _serverRemainingSeconds() {
+    if (_config.secondsLeft > 0) return _config.secondsLeft;
+    return _remainingFromEndTime() ?? _battleDuration;
+  }
+
+  int? _remainingFromEndTime() {
+    final end = DateTime.tryParse(_config.endTime ?? '');
+    if (end == null) return null;
+    final left = end.difference(DateTime.now()).inSeconds;
+    return left > 0 ? left : null;
+  }
+
+  int? _secondsLeftFromMapEndTime(Map<String, dynamic> map) {
+    final raw = map['endTime'] ?? map['pkEndTime'];
+    final end = DateTime.tryParse(raw?.toString() ?? '');
+    if (end == null) return null;
+    final left = end.difference(DateTime.now()).inSeconds;
+    return left >= 0 ? left : null;
   }
 
   // ===========================================================================

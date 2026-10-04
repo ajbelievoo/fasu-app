@@ -204,6 +204,9 @@ class PkConfig {
     this.pkAutoStartBlocked = false,
     this.showStartButton = false,
     this.punishmentTask,
+    this.startTime,
+    this.endTime,
+    this.secondsLeft = 0,
   });
 
   // Mutable so the live screen can fill it in when the backend pkId arrives
@@ -244,6 +247,12 @@ class PkConfig {
   bool pkAutoStartBlocked;
   bool showStartButton;
   String? punishmentTask;
+  // Server-authoritative battle clock (pkTiming payload) — lets late joiners
+  // and reconnects start the countdown at the REAL remaining time instead of
+  // the full duration.
+  String? startTime;
+  String? endTime;
+  int secondsLeft;
 
   factory PkConfig.fromJson(Map<String, dynamic> json) => PkConfig(
     pkId: parseString(
@@ -313,6 +322,9 @@ class PkConfig {
     pkAutoStartBlocked: parseBool(json['pkAutoStartBlocked']),
     showStartButton: parseBool(json['showStartButton']),
     punishmentTask: parseString(json['punishmentTask']),
+    startTime: parseString(json['startTime']),
+    endTime: parseString(json['endTime']),
+    secondsLeft: parseInt(json['secondsLeft'] ?? json['remainingSeconds'], 0),
   );
 
   Map<String, dynamic> toJson() => {
@@ -356,6 +368,9 @@ class PkConfig {
     'pkAutoStartBlocked': pkAutoStartBlocked,
     'showStartButton': showStartButton,
     'punishmentTask': punishmentTask,
+    'startTime': startTime,
+    'endTime': endTime,
+    'secondsLeft': secondsLeft,
   };
 }
 
