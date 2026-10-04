@@ -338,9 +338,16 @@ class AuthProvider extends ChangeNotifier {
 
   /// Persist the user to [SessionManager] and apply the token to [ApiClient].
   void _persistUser(User user) {
-    session.saveUser(user);
-    if (user.token != null && user.token!.isNotEmpty) {
-      ApiClient.setAuthToken(user.token);
+    // Keep the session JWT when the API payload omits it — a token-less
+    // save wipes auth for every subsequent cold start.
+    final prev = session.getUser();
+    final merged =
+        user.token?.isNotEmpty == true
+            ? user
+            : user.copyWith(token: prev?.id == user.id ? prev?.token : null);
+    session.saveUser(merged);
+    if (merged.token != null && merged.token!.isNotEmpty) {
+      ApiClient.setAuthToken(merged.token);
     }
   }
 
@@ -400,7 +407,16 @@ class AuthProvider extends ChangeNotifier {
         'deviceId': deviceId,
       });
       if (res.status && res.user != null) {
-        session.saveUser(res.user);
+        // getUser never returns the session JWT — saveUser with a token-less
+        // user wipes the persisted token, so the next cold start sends no
+        // Authorization header and every authed endpoint 401s.
+        final merged =
+            res.user!.token?.isNotEmpty == true
+                ? res.user!
+                : res.user!.copyWith(
+                  token: session.getUser()?.token ?? ApiClient.getAuthToken(),
+                );
+        session.saveUser(merged);
         notifyListeners();
       }
       return res;
