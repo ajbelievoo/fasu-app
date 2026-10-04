@@ -2977,7 +2977,14 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                     ? Map<String, dynamic>.from(map['user'] as Map)
                     : <String, dynamic>{});
         final userName =
-            map['name']?.toString() ?? userMap['name']?.toString() ?? 'User';
+            map['name']?.toString() ??
+            map['userName']?.toString() ??
+            map['username']?.toString() ??
+            map['senderName']?.toString() ??
+            userMap['name']?.toString() ??
+            userMap['userName']?.toString() ??
+            userMap['username']?.toString() ??
+            'User';
         final imageUrl = map['imageUrl']?.toString() ?? '';
         final senderId =
             map['userId']?.toString() ??
@@ -4432,11 +4439,17 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         // Harvest the authoritative host id the backend echoes in arg1
         // (hostId/hostUserId/liveUserId) so host entries can be excluded
         // from the viewer count on every device — no fetch needed.
+        int? serverViewerCount;
         for (final m in extraArgs.whereType<Map>()) {
           for (final k in const ['hostId', 'hostUserId', 'liveUserId']) {
             final hid = m[k]?.toString();
             if (hid != null && hid.isNotEmpty) _hostIds.add(hid);
           }
+          final vc = parseInt(
+            m['viewerCount'] ?? m['viewersCount'] ?? m['onlineCount'],
+            -1,
+          );
+          if (vc >= 0) serverViewerCount = vc;
         }
         // Harvest the host's current agora uid from the authoritative
         // snapshot — refreshes _expectedHostAgoraUid when the host re-lives
@@ -4574,7 +4587,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
               if (aTop != bTop) return aTop ? -1 : 1;
               return 0;
             });
-            _viewerCount = _viewers.length;
+            // Prefer the server's authoritative count — every device shows the
+            // same number even when individual roster rows drop client-side
+            // (id mismatch, stale parse, recently-removed guards).
+            _viewerCount = serverViewerCount ?? _viewers.length;
           });
           // Native uses view arg1 for joiner entrance effects (entrySvga etc.)
           // — feed it here too; the overlay dedupes against the join comment.
@@ -11740,7 +11756,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                 onPressed: () {
                   Navigator.pop(ctx);
                   if (widget.isHost) {
-                    _endLive();
+                    // Picking "End Live" inside the options sheet IS the
+                    // confirmation — a second dialog just stacked annoyingly.
+                    _endLive(confirm: false);
                   } else {
                     _leaveRoom();
                   }
