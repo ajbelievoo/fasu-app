@@ -1086,6 +1086,12 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     };
     // Note: 'liveUserId' is deliberately NOT checked — seat/event payloads
     // sometimes carry the acting user's id there (a guest), not the room's.
+    // A payload may carry MULTIPLE room aliases (liveStreamingId = the
+    // LiveHistory id, liveUserMongoId = the LiveUser._id). Requiring every
+    // non-empty key to match drops legitimate events that mix aliases —
+    // accept when ANY recognized key matches; only reject when the payload
+    // carries room keys and none of them are ours.
+    var sawRoomKey = false;
     for (final key in const [
       'liveStreamingId',
       'roomId',
@@ -1094,9 +1100,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'liveUserMongoId',
     ]) {
       final v = map[key]?.toString();
-      if (v != null && v.isNotEmpty && !ids.contains(v)) return false;
+      if (v == null || v.isEmpty) continue;
+      sawRoomKey = true;
+      if (ids.contains(v)) return true;
     }
-    return true;
+    return !sawRoomKey;
   }
 
   /// Host user ID for this room. Used as the `liveUserId` in socket payloads.
