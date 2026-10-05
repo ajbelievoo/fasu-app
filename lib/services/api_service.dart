@@ -3254,6 +3254,60 @@ class ApiService {
     return _asMap(r.data);
   }
 
+  /// Get all hosts/agents under a BD (paginated).
+  static Future<Map<String, dynamic>> getBdHosts(
+    String bdId, {
+    int start = 1,
+    int limit = 50,
+  }) async {
+    final r = await _dio.get(
+      '/bd/getBdHosts',
+      queryParameters: {'bdId': bdId, 'start': start, 'limit': limit},
+    );
+    return _asMap(r.data);
+  }
+
+  /// BD commission history + totals (mirror of BD-desk Income page).
+  static Future<Map<String, dynamic>> getBdCommissionHistory(
+    String bdId, {
+    String? startDate,
+    String? endDate,
+  }) async {
+    final r = await _dio.get(
+      '/bd/commissionHistory',
+      queryParameters: {
+        'bdId': bdId,
+        if (startDate != null) 'startDate': startDate,
+        if (endDate != null) 'endDate': endDate,
+      },
+    );
+    return _asMap(r.data);
+  }
+
+  /// BD withdrawal balance (earned / pending / available).
+  static Future<Map<String, dynamic>> getBdWithdrawalBalance(
+    String bdId,
+  ) async {
+    final r = await _dio.get(
+      '/bd/withdrawalBalance',
+      queryParameters: {'bdId': bdId},
+    );
+    return _asMap(r.data);
+  }
+
+  /// Change the BD panel password — bound to the app's user JWT (the app
+  /// never carries a BD-panel token).
+  static Future<RestResponse> changeBdPassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    final r = await _dio.patch(
+      '/bd/changePasswordApp',
+      data: {'oldPassword': oldPassword, 'newPassword': newPassword},
+    );
+    return RestResponse.fromJson(_asMap(r.data));
+  }
+
   /// Get BD for a given agency code.
   static Future<Map<String, dynamic>> getBdForAgency(String bdCode) async {
     final r = await _dio.get(

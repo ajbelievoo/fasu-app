@@ -18,7 +18,7 @@ import '../../models/json_annotation_helper.dart';
 import '../../services/api_service.dart';
 import '../../services/session_manager.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/format_utils.dart' show formatCount;
+import '../../utils/format_utils.dart' show diamondsToBeans, formatCount;
 import '../../utils/log.dart';
 import '../../widgets/premium_ui.dart';
 import '../../widgets/user_avatar.dart';
@@ -39,6 +39,9 @@ class _BdCenterScreenState extends State<BdCenterScreen>
   Map<String, dynamic>? _earning;
   Map<String, dynamic>? _settlement;
   Map<String, dynamic>? _hostRequests;
+  Map<String, dynamic>? _hosts;
+  Map<String, dynamic>? _commission;
+  Map<String, dynamic>? _withdrawal;
   bool _loading = true;
   String? _error;
 
@@ -47,7 +50,7 @@ class _BdCenterScreenState extends State<BdCenterScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 4, vsync: this);
+    _tabCtrl = TabController(length: 5, vsync: this);
     _loadAll();
   }
 
@@ -90,12 +93,22 @@ class _BdCenterScreenState extends State<BdCenterScreen>
         ApiService.getBdEarning(bdId, startDate: startDate, endDate: endDate),
         ApiService.getBdSettlement(bdId, startDate: startDate, endDate: endDate),
         ApiService.getBdHostRequests(bdId),
+        ApiService.getBdHosts(bdId),
+        ApiService.getBdCommissionHistory(
+          bdId,
+          startDate: startDate,
+          endDate: endDate,
+        ),
+        ApiService.getBdWithdrawalBalance(bdId),
       ]);
       _profile = profileRes;
       _agencyData = results[0];
       _earning = results[1];
       _settlement = results[2];
       _hostRequests = results[3];
+      _hosts = results[4];
+      _commission = results[5];
+      _withdrawal = results[6];
     } catch (e, s) {
       Log.e(_tag, 'load failed', e, s);
       _error = e.toString();
@@ -139,6 +152,7 @@ class _BdCenterScreenState extends State<BdCenterScreen>
                   children: [
                     _buildDashboardTab(),
                     _buildAgenciesTab(),
+                    _buildHostsTab(),
                     _buildSettlementTab(),
                     _buildRequestsTab(),
                   ],
@@ -240,9 +254,11 @@ class _BdCenterScreenState extends State<BdCenterScreen>
       labelColor: AppTheme.fg(context),
       unselectedLabelColor: AppTheme.fg(context, 0.54),
       labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+      isScrollable: true,
       tabs: const [
         Tab(text: 'Dashboard'),
         Tab(text: 'Agencies'),
+        Tab(text: 'Hosts'),
         Tab(text: 'Payouts'),
         Tab(text: 'Requests'),
       ],
@@ -294,10 +310,15 @@ class _BdCenterScreenState extends State<BdCenterScreen>
                 _infoRow('Host Diamonds', formatCount(currentHostCoin), Icons.people),
                 _infoRow('Lifetime Diamonds', formatCount(lifetimeCoin), Icons.trending_up),
                 _infoRow('Last Settlement Diamonds', formatCount(lastSettlementCoin), Icons.history),
+                _linkRow('BD Panel Link', data['loginString']?.toString() ?? 'N/A', Icons.login),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 16),
+        _buildIncomeCard(),
+        const SizedBox(height: 16),
+        _buildChangePasswordCard(),
         const SizedBox(height: 16),
         if (earningData.isNotEmpty) ...[
           Text('Weekly Earnings', style: TextStyle(color: AppTheme.fg(context), fontSize: 16, fontWeight: FontWeight.bold)),
@@ -368,6 +389,318 @@ class _BdCenterScreenState extends State<BdCenterScreen>
         final r = requests[i] as Map<String, dynamic>;
         return _requestTile(r);
       },
+    );
+  }
+
+  /// Hosts/Agents under this BD — same list the BD-desk "Hosts" page shows.
+  Widget _buildHostsTab() {
+    final hosts = _hosts?['data'] as List? ?? [];
+    if (hosts.isEmpty) {
+      return const Center(
+        child: EmptyState(
+          icon: Icons.mic,
+          title: 'No Hosts Yet',
+          subtitle: 'Hosts under your BD agencies will appear here',
+        ),
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: hosts.length,
+      itemBuilder: (_, i) {
+        final h = hosts[i] as Map<String, dynamic>;
+        return _hostTile(h);
+      },
+    );
+  }
+
+  Widget _hostTile(Map<String, dynamic> h) {
+    final agency = h['hostAgency'] as Map<String, dynamic>?;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardBg(context),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.hairline(context)),
+      ),
+      child: Row(children: [
+        UserAvatar(imageUrl: h['image']?.toString(), size: 44),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Expanded(
+                  child: Text(
+                    h['name']?.toString().isNotEmpty == true
+                        ? h['name'].toString()
+                        : (h['username']?.toString() ?? 'Host'),
+                    style: TextStyle(
+                      color: AppTheme.fg(context),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (parseBool(h['isVIP']))
+                  const Icon(Icons.star, color: Color(0xFFFFB800), size: 16),
+              ]),
+              const SizedBox(height: 3),
+              Text(
+                'ID: ${h['uniqueId'] ?? '-'}  ·  ${h['country'] ?? ''}',
+                style: TextStyle(color: AppTheme.fg(context, 0.6), fontSize: 12),
+              ),
+              Text(
+                'Agency: ${agency?['name']?.toString() ?? '-'} (${agency?['agencyCode']?.toString() ?? ''})',
+                style: TextStyle(color: AppTheme.fg(context, 0.5), fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ]),
+    );
+  }
+
+  /// Commission + withdrawal summary — shown in BEANS per spec (host income
+  /// is rCoin-denominated; diamonds → beans via the admin conversion).
+  Widget _buildIncomeCard() {
+    final setting = context.read<SessionManager>().getSetting();
+    final c = _commission?['data'] as Map<String, dynamic>? ?? {};
+    final w = _withdrawal?['data'] as Map<String, dynamic>? ?? {};
+    int beans(dynamic v) => diamondsToBeans(parseInt(v), setting);
+
+    final history = c['history'] as List? ?? [];
+    return GlassCard(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Income (Beans)',
+                style: TextStyle(
+                    color: AppTheme.fg(context),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            _infoRow('Total Commission', '${formatCount(beans(c['totalCommission']))} Beans', Icons.payments),
+            _infoRow('Pending', '${formatCount(beans(c['pendingCommission']))} Beans', Icons.hourglass_bottom),
+            _infoRow('Paid', '${formatCount(beans(c['paidCommission']))} Beans', Icons.check_circle),
+            _infoRow('Available Balance', '${formatCount(beans(w['availableBalance']))} Beans', Icons.account_balance_wallet),
+            if (history.isNotEmpty) ...[
+              const Divider(height: 24),
+              Text('Recent Commissions',
+                  style: TextStyle(
+                      color: AppTheme.fg(context, 0.8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ...history.take(7).map((raw) {
+                final h = raw as Map<String, dynamic>;
+                final paid = h['status']?.toString() == 'paid';
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Icon(
+                      paid ? Icons.check_circle : Icons.schedule,
+                      size: 16,
+                      color: paid ? const Color(0xFF30D158) : const Color(0xFFFFB800),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${h['hostName']?.toString() ?? 'Host'} · ${h['date']?.toString() ?? ''}',
+                        style: TextStyle(color: AppTheme.fg(context, 0.8), fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      '+${formatCount(beans(h['commissionAmount']))} Beans',
+                      style: TextStyle(
+                        color: AppTheme.fg(context),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ]),
+                );
+              }),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Change the BD-panel password from inside the app (BD-desk Settings
+  /// parity — the site lets a BD rotate the panel password).
+  Widget _buildChangePasswordCard() {
+    return GlassCard(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: _showChangePasswordSheet,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF6A5AE0).withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.lock_reset, color: Color(0xFF6A5AE0), size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Change BD Password',
+                      style: TextStyle(
+                          color: AppTheme.fg(context),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600)),
+                  Text('Rotate your BD panel login password',
+                      style: TextStyle(color: AppTheme.fg(context, 0.6), fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: AppTheme.fg(context, 0.4)),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showChangePasswordSheet() async {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool submitting = false;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Change BD Password',
+                  style: TextStyle(
+                      color: AppTheme.fg(ctx),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              _pwdField(ctx, oldCtrl, 'Current password'),
+              const SizedBox(height: 12),
+              _pwdField(ctx, newCtrl, 'New password (min 6 chars)'),
+              const SizedBox(height: 12),
+              _pwdField(ctx, confirmCtrl, 'Confirm new password'),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          final oldP = oldCtrl.text;
+                          final newP = newCtrl.text;
+                          if (newP.length < 6) {
+                            Fluttertoast.showToast(
+                                msg: 'New password must be at least 6 characters');
+                            return;
+                          }
+                          if (newP != confirmCtrl.text) {
+                            Fluttertoast.showToast(
+                                msg: 'New passwords do not match');
+                            return;
+                          }
+                          setSheet(() => submitting = true);
+                          try {
+                            final res = await ApiService.changeBdPassword(
+                              oldPassword: oldP,
+                              newPassword: newP,
+                            );
+                            Fluttertoast.showToast(
+                                msg: res.message ??
+                                    (res.status ? 'Password updated' : 'Failed'));
+                            if (res.status && ctx.mounted) Navigator.pop(ctx);
+                          } catch (e, st) {
+                            Log.e(_tag, 'changeBdPassword failed', e, st);
+                            Fluttertoast.showToast(msg: 'Password change failed');
+                          } finally {
+                            if (ctx.mounted) setSheet(() => submitting = false);
+                          }
+                        },
+                  child: submitting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Update Password'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    oldCtrl.dispose();
+    newCtrl.dispose();
+    confirmCtrl.dispose();
+  }
+
+  Widget _pwdField(
+      BuildContext ctx, TextEditingController ctrl, String label) {
+    return TextField(
+      controller: ctrl,
+      obscureText: true,
+      style: TextStyle(color: AppTheme.fg(ctx)),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: AppTheme.fg(ctx, 0.6)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppTheme.hairline(ctx)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF6A5AE0)),
+        ),
+      ),
     );
   }
 
