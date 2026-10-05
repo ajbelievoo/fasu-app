@@ -369,23 +369,49 @@ class AuthProvider extends ChangeNotifier {
 
   /// Ensures [ApiClient] carries a user auth token. Sessions created before
   /// the backend started issuing user JWTs have `token == null` — silently
-  /// re-login with the stored identity+email so token-bound endpoints
-  /// (wallet, redeem, gifts, referral) keep working without forcing a logout.
+  /// re-login with whatever account identifiers are stored so token-bound
+  /// endpoints (wallet, redeem, gifts, referral) keep working without
+  /// forcing a logout. loginSignup resolves a user by mobileNumber,
+  /// googleEmail, email, or the identity+email pair — any one is enough,
+  /// so don't gate on the strict pair or sparse stored profiles can never
+  /// heal (getUser 401s without a token → fields never repopulate).
   Future<void> ensureAuthToken() async {
     if ((ApiClient.getAuthToken() ?? '').isNotEmpty) return;
     final u = session.getUser();
     if (u == null) return;
-    if ((u.identity ?? '').isEmpty || (u.email ?? '').isEmpty) return;
+    final body = <String, dynamic>{
+      'loginType': u.loginType ?? 0,
+      'fcmToken': u.fcmToken ?? '',
+    };
+    var hasIdentifier = false;
+    for (final key in const ['mobileNumber', 'googleEmail', 'email']) {
+      final v = switch (key) {
+        'mobileNumber' => u.mobileNumber,
+        'googleEmail' => u.googleEmail,
+        _ => u.email,
+      };
+      if (v != null && v.isNotEmpty) {
+        body[key] = v;
+        hasIdentifier = true;
+      }
+    }
+    if ((u.identity ?? '').isNotEmpty) body['identity'] = u.identity;
+    if (!hasIdentifier) {
+      // Only an identity can't resolve a user on loginSignup (its identity
+      // fallback also requires email) — nothing to heal with.
+      Log.w(
+        _tag,
+        'ensureAuthToken: no stored identifiers to heal with — re-login needed',
+      );
+      return;
+    }
     try {
-      final res = await ApiService.createUser({
-        'identity': u.identity,
-        'email': u.email,
-        'loginType': u.loginType ?? 0,
-        'fcmToken': u.fcmToken ?? '',
-      });
+      final res = await ApiService.createUser(body);
       if (res.status && res.user != null) {
         _persistUser(res.user!);
         Log.d(_tag, 'ensureAuthToken: token refreshed silently');
+      } else {
+        Log.w(_tag, 'ensureAuthToken: loginSignup refused (${res.message})');
       }
     } catch (e) {
       Log.w(_tag, 'ensureAuthToken failed: $e');
