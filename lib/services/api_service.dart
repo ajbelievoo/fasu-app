@@ -2277,10 +2277,45 @@ class ApiService {
     return AudioRoomRoot.fromJson(_asMap(r.data));
   }
 
-  static Future<RestResponse> endAudioRoom(String roomId) async {
+  /// End an audio room. The backend expects `liveStreamingId` + the host's
+  /// `userId` in the POST body — previously only a `roomId` query param was
+  /// sent so the call always returned "required" and the room stayed live.
+  static Future<RestResponse> endAudioRoom(
+    String roomId, {
+    String? userId,
+  }) async {
     final r = await _dio.post(
       '/audioRoom/end',
+      data: {
+        'liveStreamingId': roomId,
+        'roomId': roomId,
+        if (userId != null) 'userId': userId,
+      },
       queryParameters: {'roomId': roomId},
+    );
+    return RestResponse.fromJson(_asMap(r.data));
+  }
+
+  /// Lift a user's kick ban from an audio room (host/admin action).
+  /// POST /audioRoom/unkick — the kicked user's app clears its local ban via
+  /// the `viewerUnkicked` socket event so they can rejoin immediately.
+  static Future<RestResponse> unkickAudioRoomUser({
+    required String liveStreamingId,
+    required String targetUserId,
+    String? hostUserId,
+    String? liveUserMongoId,
+  }) async {
+    final r = await _dio.post(
+      '/audioRoom/unkick',
+      data: {
+        'liveStreamingId': liveStreamingId,
+        'roomId': liveStreamingId,
+        'targetUserId': targetUserId,
+        'kickedUserId': targetUserId,
+        'userId': targetUserId,
+        if (hostUserId != null) 'hostUserId': hostUserId,
+        if (liveUserMongoId != null) 'liveUserMongoId': liveUserMongoId,
+      },
     );
     return RestResponse.fromJson(_asMap(r.data));
   }

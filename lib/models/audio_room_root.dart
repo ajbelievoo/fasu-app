@@ -482,6 +482,7 @@ class AudioRoomUser {
     this.musicPermission = 'host',
     this.chatMode = 'anyone',
     this.micMode = 'anyone',
+    this.isHostMute = 0,
   });
 
   final String? id;
@@ -545,6 +546,11 @@ class AudioRoomUser {
   /// forces the raise-hand flow even when wheat mode is on).
   final String micMode;
 
+  /// `audioConfig.isHostMute` — persists the host's mic-off state at room
+  /// level so late joiners / full-room refreshes keep the mute icon on the
+  /// owner seat (0/1/2, same semantics as SeatItem.mute).
+  final int isHostMute;
+
   List<String> get roomTags {
     return [
       if (familyName?.isNotEmpty == true) familyName!,
@@ -607,6 +613,7 @@ class AudioRoomUser {
     String? musicPermission,
     String? chatMode,
     String? micMode,
+    int? isHostMute,
   }) => AudioRoomUser(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -661,6 +668,7 @@ class AudioRoomUser {
     musicPermission: musicPermission ?? this.musicPermission,
     chatMode: chatMode ?? this.chatMode,
     micMode: micMode ?? this.micMode,
+    isHostMute: isHostMute ?? this.isHostMute,
   );
 
   factory AudioRoomUser.fromJson(Map<String, dynamic> json) {
@@ -784,6 +792,12 @@ class AudioRoomUser {
             json['micMode'] ?? json['micPermission'],
           )?.toLowerCase() ??
           'anyone',
+      isHostMute: parseInt(
+        json['audioConfig'] is Map
+            ? (json['audioConfig'] as Map)['isHostMute']
+            : json['isHostMute'],
+        0,
+      ),
     );
   }
 

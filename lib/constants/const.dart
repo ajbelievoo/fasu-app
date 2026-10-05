@@ -193,6 +193,7 @@ class Const {
 
   // Live room moderation — emitted by backend when host kicks/bans/mutes.
   static const String eventViewerKicked = 'viewerKicked';
+  static const String eventViewerUnkicked = 'viewerUnkicked';
   static const String eventViewerMuted = 'viewerMuted';
 
   // Live room games — emitted by backend when a game result is computed.

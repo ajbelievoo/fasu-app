@@ -588,6 +588,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   // does not stay `isAdd:true` forever (the socket stays connected, so the
   // server's disconnect sweep never runs for it).
   bool _leaveEventsEmitted = false;
+
+  /// Set when the kick-ban guard blocks this join — gates every join emit
+  /// (addView / commentAudio / seat claims) so a kicked user's entry attempt
+  /// never registers a ghost viewer row or a "joined" comment.
+  bool _joinBlockedByKickBan = false;
   bool? _pendingBroadcastRole;
   bool? _pendingMicEnabled;
   bool _micEnabled = true;
@@ -1127,12 +1132,62 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
 
   /// If the current user was kicked from this room and the ban hasn't
   /// expired yet, show a toast and close the screen before any join happens.
+  /// Also cross-checks the backend kickHistory — if the host lifted the ban
+  /// (unkick) the local SharedPreferences entry is cleared and the user may
+  /// join immediately instead of waiting out the stale local timer.
   Future<void> _enforceKickBan() async {
     final roomKey = _liveId;
     if (roomKey.isEmpty) return;
     try {
-      final remaining = await RoomBanService.bannedRemaining(roomKey);
+      var remaining = await RoomBanService.bannedRemaining(roomKey);
+      if (remaining != null) {
+        // Server is authoritative — a removed kickHistory entry means the
+        // host un-kicked this user, so drop the stale local ban.
+        try {
+          final myId = context.read<SessionManager>().userId;
+          final history = await ApiService.getAudioRoomKickHistory(roomKey);
+          final now = DateTime.now();
+          var serverBanned = false;
+          var kicksInWindow = 0;
+          var lastKickMs = 0;
+          for (final e in history) {
+            if (e is! Map) continue;
+            final k = Map<String, dynamic>.from(e);
+            final kid =
+                (k['userId'] is Map
+                        ? (k['userId']['_id'] ?? k['userId']['id'])
+                        : k['userId'])
+                    ?.toString();
+            if (kid != myId) continue;
+            final at = DateTime.tryParse(k['kickedAt']?.toString() ?? '');
+            if (at == null) continue;
+            final age = now.difference(at);
+            if (age.inHours < 24) {
+              kicksInWindow++;
+              final ms = at.millisecondsSinceEpoch;
+              if (ms > lastKickMs) lastKickMs = ms;
+            }
+          }
+          if (kicksInWindow > 0 && lastKickMs > 0) {
+            final banMs = kicksInWindow >= 3 ? 24 * 3600e3 : 2 * 3600e3;
+            final remMs =
+                lastKickMs + banMs - now.millisecondsSinceEpoch;
+            serverBanned = remMs > 0;
+            if (serverBanned) {
+              remaining = Duration(milliseconds: remMs.round());
+            }
+          }
+          if (!serverBanned) {
+            // Host lifted the ban — clear locally and allow the join.
+            await RoomBanService.clearBan(roomKey);
+            remaining = null;
+          }
+        } catch (_) {
+          // Server check failed — fall back to the local ban as-is.
+        }
+      }
       if (remaining != null && mounted) {
+        _joinBlockedByKickBan = true;
         Fluttertoast.showToast(
           msg:
               'You were kicked from this room. Try again after '
@@ -1528,10 +1583,27 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       // Add the host's profile to the top owner seat so both host and
       // viewers can see them. The host's userId/name/image come from the
       // room data (_roomUser) which the backend sends on join.
-      final position =
+      var position =
           _hasAuthoritativeHostPosition
               ? (_authoritativeHostPosition ?? -1)
               : -1;
+      // A stale authoritative grid position must never stomp a seat occupied
+      // by someone else — that would draw the host's frame/avatar over the
+      // other user's seat. Fall back to the owner seat (-1) instead.
+      if (position >= 0) {
+        final existing =
+            _seats.where((s) => s.position == position).firstOrNull;
+        if (existing != null &&
+            existing.isOccupied &&
+            existing.userId != hostUserId) {
+          Log.w(
+            _tag,
+            'SEAT_AUDIT _ensureHostInSeats: authoritative hostPosition=$position '
+            'is occupied by ${existing.userId} — placing host on owner seat',
+          );
+          position = -1;
+        }
+      }
       final hostSeat = SeatItem(
         userId: hostUserId,
         name: _roomUser.name,
@@ -2902,12 +2974,33 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   Future<void> _emitJoinEventsAsync({bool announce = true}) async {
     if (!mounted) return;
     try {
+      // Kick-ban gate — must run BEFORE addView/commentAudio so a kicked
+      // user's join attempt never registers a viewer row or a "joined the
+      // room" comment (they only tried to enter, never got in).
+      final banRoomKey = _liveId;
+      if (banRoomKey.isNotEmpty) {
+        final remaining = await RoomBanService.bannedRemaining(banRoomKey);
+        if (remaining != null) {
+          _joinBlockedByKickBan = true;
+          Log.w(_tag, 'JOIN_AUDIT blocked — kick ban active for $banRoomKey');
+          if (mounted) {
+            Fluttertoast.showToast(
+              msg:
+                  'You were kicked from this room. Try again after '
+                  '${RoomBanService.formatRemaining(remaining)}',
+              toastLength: Toast.LENGTH_LONG,
+            );
+            Navigator.of(context).pop();
+          }
+          return;
+        }
+      }
       final session = context.read<SessionManager>();
       final user = session.getUser();
       final invisible = await VipPrivilegeHelper.shouldJoinInvisible(session);
       // The post-frame callback can land after a failed-join pop —
       // emitting addView now would persist a ghost viewer row.
-      if (!mounted) return;
+      if (!mounted || _joinBlockedByKickBan) return;
       final liveId = _liveId;
       final liveUserMongoId = _roomUser.id ?? '';
       final hostId = _hostUserId ?? liveUserMongoId;
@@ -3465,9 +3558,27 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       if (targetUserId.isEmpty) return;
       final myUserId = context.read<SessionManager>().userId;
       if (targetUserId == myUserId) {
+        final roomKey = _liveId.isNotEmpty ? _liveId : (_roomUser.id ?? '');
+        if (map['reason'] == 'kick_ban_active') {
+          // Server rejected our addView because the ban is still active —
+          // do NOT record another kick (a blocked re-entry attempt must not
+          // extend the 2h window or push the count toward the 24h tier).
+          _joinBlockedByKickBan = true;
+          final remMs =
+              (map['banRemainingMs'] as num?)?.round() ?? 0;
+          if (mounted) {
+            Fluttertoast.showToast(
+              msg:
+                  'You were kicked from this room. Try again after '
+                  '${RoomBanService.formatRemaining(Duration(milliseconds: remMs))}',
+              toastLength: Toast.LENGTH_LONG,
+            );
+            _cleanupAndLeave();
+          }
+          return;
+        }
         // Record the kick — kicked users are blocked from this room for 2h
         // (24h if kicked 3+ times within a day).
-        final roomKey = _liveId.isNotEmpty ? _liveId : (_roomUser.id ?? '');
         RoomBanService.recordKick(roomKey).then((ban) {
           if (!mounted) return;
           Fluttertoast.showToast(
@@ -5239,27 +5350,67 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         final rawImage = map['image']?.toString() ?? '';
         final reactionImage = VideoUtil.getFullImageUrl(rawImage);
         final reactionName = map['name']?.toString() ?? '';
-        final position = (map['position'] as num?)?.toInt() ?? -1;
-        // Native audio host uses -2 for the top/owner overlay; map it to our -1 key.
-        final displayPosition = position == -2 ? -1 : position;
+        // Reaction position semantics (native protocol):
+        //   -2 = host/owner overlay (top seat, keyed -1 in _seatReactions)
+        //   >= 0 = that grid seat — only if the SENDER actually sits there
+        //   -1 or missing = audience → comment only, NEVER a seat overlay.
+        final rawPosition = (map['position'] as num?)?.toInt();
+        final senderId =
+            (map['user'] is Map
+                    ? (map['user'] as Map)['userId'] ?? (map['user'] as Map)['_id']
+                    : null)
+                ?.toString() ??
+            map['userId']?.toString();
+        int? displayPosition;
+        if (rawPosition == -2) {
+          displayPosition = -1; // host overlay key
+        } else if (rawPosition != null && rawPosition >= 0) {
+          final seat = _seats
+              .where((s) => s.position == rawPosition)
+              .firstOrNull;
+          final senderSeatedHere =
+              seat != null &&
+              seat.isOccupied &&
+              (senderId == null ||
+                  senderId.isEmpty ||
+                  seat.userId == senderId);
+          if (senderSeatedHere) {
+            displayPosition = rawPosition;
+          } else {
+            // Sender isn't on that seat anymore (stale event) — if they sit
+            // elsewhere now, show it on their CURRENT seat; audience → none.
+            final senderSeat =
+                senderId == null
+                    ? null
+                    : _seats
+                        .where((s) => s.userId == senderId)
+                        .firstOrNull;
+            displayPosition =
+                (senderSeat != null && senderSeat.position >= 0)
+                    ? senderSeat.position
+                    : null;
+          }
+        }
 
         // Show reaction on the target seat / host avatar (image or text fallback).
-        if (reactionImage.isNotEmpty || reactionName.isNotEmpty) {
+        if (displayPosition != null &&
+            (reactionImage.isNotEmpty || reactionName.isNotEmpty)) {
           if (mounted) {
             setState(() {
               if (reactionImage.isNotEmpty) {
-                _seatReactions[displayPosition] = reactionImage;
+                _seatReactions[displayPosition!] = reactionImage;
               }
               if (reactionName.isNotEmpty) {
-                _seatReactionNames[displayPosition] = reactionName;
+                _seatReactionNames[displayPosition!] = reactionName;
               }
             });
             // Auto-clear after 7 seconds (ports native 7000ms)
+            final clearKey = displayPosition;
             Future.delayed(const Duration(seconds: 7), () {
               if (mounted) {
                 setState(() {
-                  _seatReactions.remove(displayPosition);
-                  _seatReactionNames.remove(displayPosition);
+                  _seatReactions.remove(clearKey);
+                  _seatReactionNames.remove(clearKey);
                 });
               }
             });
@@ -6871,6 +7022,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         roomWelcome: updated.roomWelcome ?? _roomUser.roomWelcome,
         seatCount: targetCount,
         musicPermission: updated.musicPermission,
+        isHostMute: updated.isHostMute,
       );
       if (map.containsKey('hostPosition')) {
         _hasAuthoritativeHostPosition = true;
@@ -6988,6 +7140,19 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       }
       _sanitizeSeats();
       _ensureHostInSeats();
+      // Host mic-off state rides `audioConfig.isHostMute` on the room doc —
+      // mirror it onto the owner seat so viewers keep seeing (or stop seeing)
+      // the mute icon even though the backend seat[] has no -1 element.
+      {
+        final hostIdx = _seats.indexWhere(
+          (s) =>
+              (s.position == -1 || s.isHost) &&
+              s.userId == _hostUserId,
+        );
+        if (hostIdx >= 0) {
+          _seats[hostIdx].mute = updated.isHostMute;
+        }
+      }
       _syncSeatCount(targetCount);
       for (final uid in _remoteAgoraUids.toList()) {
         _bindRemoteAgoraUid(uid);
@@ -7535,23 +7700,34 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         currentSeat?.voiceWaveUrl ?? user?.vipDetails?.voiceWaveUrl;
 
     // Update the seat locally so the UI shows the user immediately.
+    // IMPORTANT: build a FRESH SeatItem rather than copyWith — copyWith keeps
+    // the previous occupant's identity fields (avatarFrame/vipBadgeUrl/
+    // voiceWaveUrl) when the new user passes null, which leaked the prior
+    // sitter's (e.g. the host's) frame onto the new occupant.
     final idx = _seats.indexWhere((e) => e.position == position);
     if (idx >= 0) {
       setState(() {
         // Clear myself from any other seat I was on (prevents overlap).
         _clearUserFromOtherSeats(userId, exceptPosition: position);
-        _seats[idx] = _seats[idx].copyWith(
+        final prev = _seats[idx];
+        final sameOccupant = prev.userId == userId;
+        _seats[idx] = SeatItem(
+          position: position,
+          lock: prev.lock,
           userId: userId,
           name: userName,
           image: user?.image ?? session.userImage,
           country: user?.country ?? session.getCountry(),
+          countryFlagImage: sameOccupant ? prev.countryFlagImage : null,
           agoraUid: myAgoraUid,
           reserved: true,
           mute: muteState,
           role: role,
           avatarFrame: avatarFrame,
           voiceWaveUrl: voiceWaveUrl,
-          isVIP: currentSeat?.isVIP ?? user?.isVIP,
+          isVIP: currentSeat?.isVIP ?? user?.isVIP ?? false,
+          vipBadgeUrl:
+              sameOccupant ? prev.vipBadgeUrl : user?.vipDetails?.levelBadgeUrl,
         );
       });
       _updateSelfPosition();
@@ -7907,7 +8083,10 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       _clearUserFromOtherSeats(userId, exceptPosition: position);
       final idx = _seats.indexWhere((e) => e.position == position);
       if (idx >= 0) {
-        _seats[idx] = _seats[idx].copyWith(
+        // Fresh SeatItem — never inherit the previous occupant's frame/VIP.
+        _seats[idx] = SeatItem(
+          position: position,
+          lock: _seats[idx].lock,
           userId: userId,
           name: name,
           image: image,
@@ -7915,6 +8094,9 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           mute: 0,
           role: role,
           agoraUid: agoraUid,
+          avatarFrame:
+              map['avatarFrame']?.toString() ??
+              map['avatarFrameImage']?.toString(),
         );
       } else {
         _seats.add(
@@ -7998,12 +8180,27 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     final avatarFrame = reqData?['avatarFrame']?.toString();
     final vipBadgeUrl = reqData?['vipBadgeUrl']?.toString();
 
-    // Find any empty, unlocked seat (position >= 0).
+    // Honor the position the user actually requested (the seat they tapped).
+    // Fall back to the first free seat only when that seat is gone/locked.
+    final requestedPos =
+        c.seatRequestPosition ?? _parsePosition(reqData?['position']);
     int targetPos = -1;
-    for (final s in _seats) {
-      if (s.position >= 0 && !s.reserved && !s.lock) {
-        targetPos = s.position;
-        break;
+    if (requestedPos != null && requestedPos >= 0) {
+      final reqSeat =
+          _seats.where((s) => s.position == requestedPos).firstOrNull;
+      if (reqSeat != null &&
+          !reqSeat.isOccupied &&
+          !reqSeat.reserved &&
+          !reqSeat.lock) {
+        targetPos = requestedPos;
+      }
+    }
+    if (targetPos < 0) {
+      for (final s in _seats) {
+        if (s.position >= 0 && !s.isOccupied && !s.reserved && !s.lock) {
+          targetPos = s.position;
+          break;
+        }
       }
     }
     if (targetPos < 0) {
@@ -8019,12 +8216,15 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'Host accepting from comment: userId=$targetUserId pos=$targetPos role=$role agoraUid=$agoraUid isVIP=$isVIP',
     );
 
-    // Update host seat locally.
+    // Update host seat locally. Fresh SeatItem (not copyWith) so the previous
+    // occupant's frame/VIP assets never leak onto the new sitter.
     final idx = _seats.indexWhere((e) => e.position == targetPos);
     if (idx >= 0) {
       setState(() {
         _clearUserFromOtherSeats(targetUserId, exceptPosition: targetPos);
-        _seats[idx] = _seats[idx].copyWith(
+        _seats[idx] = SeatItem(
+          position: targetPos,
+          lock: _seats[idx].lock,
           userId: targetUserId,
           name: targetName,
           image: targetImage,
@@ -11619,7 +11819,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     // Hard-terminate audio room on server
     try {
       await Future.wait([
-        ApiService.endAudioRoom(audioLiveId).catchError((e) {
+        ApiService.endAudioRoom(audioLiveId, userId: myUserId).catchError((e) {
           Log.w(_tag, 'endAudioRoom err: $e');
           return RestResponse(status: false);
         }),
@@ -11820,7 +12020,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     //        no one can re-join, no further billing, no penalty on host.
     try {
       await Future.wait([
-        ApiService.endAudioRoom(liveId).catchError((e) {
+        ApiService.endAudioRoom(liveId, userId: myUserId).catchError((e) {
           Log.w(_tag, 'endAudioRoom error: $e');
           return RestResponse(status: false);
         }),
@@ -12658,13 +12858,18 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         final user = session.getUser();
         // Send full image URL + name so other clients can display it directly.
         // Ports native EVENTSENDREACTION emit with user JSON + position.
+        // Position semantics: seated → own seat index; host not on a grid
+        // seat → -2 (owner overlay); audience → -1 (comment only).
+        final reactionPosition =
+            _selfPosition >= 0 ? _selfPosition : (_amHost ? -2 : -1);
         SocketService.instance.emit(Const.eventSendReaction, {
           'liveStreamingId': liveId,
           'userId': session.userId,
           'image': VideoUtil.getFullImageUrl(emoji.image),
           'name': emoji.name ?? '',
-          'position': _selfPosition,
+          'position': reactionPosition,
           'user': {
+            'userId': session.userId,
             'id': session.userId,
             'name': user?.name ?? '',
             'image': VideoUtil.getFullImageUrl(user?.image),

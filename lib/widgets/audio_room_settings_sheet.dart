@@ -10,12 +10,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../utils/media_utils.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 
 import '../constants/const.dart';
 import '../models/audio_room_root.dart';
+import '../models/common_models.dart';
 import '../routes/app_routes.dart';
 import '../screens/live/choose_room_type_screen.dart';
 import '../services/api_service.dart';
@@ -263,14 +263,33 @@ class _AudioRoomSettingsPageState extends State<_AudioRoomSettingsPage> {
     );
     if (confirmed != true) return;
 
+    final liveId = widget.roomUser.liveStreamingId ?? '';
+    var terminated = false;
     try {
-      await ApiService.deleteAudioRoom(session.userId);
+      // End the room session first (marks history ended + broadcasts
+      // liveEnd/destroyRoom so every viewer exits), then hard-terminate the
+      // audio session (resets seat/view/transient state on the server).
+      if (liveId.isNotEmpty) {
+        await ApiService.endAudioRoom(
+          liveId,
+          userId: session.userId,
+        ).catchError((_) => RestResponse(status: false));
+      }
+      final del = await ApiService.deleteAudioRoom(
+        session.userId,
+      ).catchError((_) => RestResponse(status: false));
       await ApiService.userHostLiveEnd(
         widget.roomUser.id ?? '',
-        widget.roomUser.liveStreamingId ?? '',
-      );
+        liveId,
+      ).catchError((_) => RestResponse(status: false));
+      terminated = del.status == true;
       if (mounted) {
-        Fluttertoast.showToast(msg: 'Room deleted successfully');
+        Fluttertoast.showToast(
+          msg:
+              terminated
+                  ? 'Room deleted successfully'
+                  : (del.message?.toString() ?? 'Failed to delete room'),
+        );
         Navigator.pop(context);
       }
     } catch (e) {
@@ -689,60 +708,144 @@ class _AudioRoomSettingsPageState extends State<_AudioRoomSettingsPage> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder:
-              (pageCtx) => Scaffold(
-                backgroundColor: AppTheme.themed(
-                  pageCtx,
-                  0xFF121212,
-                  0xFFFAFAFE,
-                ),
-                appBar: AppBar(
-                  backgroundColor: AppTheme.themed(
-                    pageCtx,
-                    0xFF121212,
-                    0xFFFAFAFE,
-                  ),
-                  elevation: 0,
-                  iconTheme: IconThemeData(color: AppTheme.fg(pageCtx)),
-                  title: Text(
-                    'Kick History',
-                    style: TextStyle(color: AppTheme.fg(pageCtx), fontSize: 18),
-                  ),
-                ),
-                body: ListView.builder(
-                  itemCount: history.length,
-                  itemBuilder: (tileCtx, i) {
-                    final k =
-                        history[i] is Map
-                            ? Map<String, dynamic>.from(history[i] as Map)
-                            : <String, dynamic>{};
-                    final name = k['name']?.toString() ?? 'User';
-                    final image = k['image']?.toString() ?? '';
-                    final by = k['kickedByName']?.toString() ?? '';
-                    return ListTile(
-                      leading: CircleAvatar(
-                        backgroundImage:
-                            image.isNotEmpty
-                                ? CachedNetworkImageProvider(image)
-                                : null,
-                        child:
-                            image.isEmpty
-                                ? const Icon(Icons.person, color: Colors.white)
-                                : null,
+              (pageCtx) => StatefulBuilder(
+                builder: (sbCtx, setSb) {
+                  final removing = <String>{};
+                  Future<void> removeBan(Map<String, dynamic> k) async {
+                    final targetId = k['userId']?.toString() ?? '';
+                    if (targetId.isEmpty || removing.contains(targetId)) {
+                      return;
+                    }
+                    removing.add(targetId);
+                    try {
+                      final res = await ApiService.unkickAudioRoomUser(
+                        liveStreamingId: roomId,
+                        targetUserId: targetId,
+                        hostUserId: widget.roomUser.hostUserId,
+                        liveUserMongoId: widget.roomUser.id,
+                      );
+                      if (res.status == true) {
+                        Fluttertoast.showToast(
+                          msg:
+                              res.message?.toString() ??
+                              'Ban removed — user can rejoin now',
+                        );
+                        setSb(() {
+                          history.removeWhere(
+                            (e) =>
+                                e is Map &&
+                                e['userId']?.toString() == targetId,
+                          );
+                        });
+                        if (history.isEmpty && sbCtx.mounted) {
+                          Navigator.of(sbCtx).pop();
+                        }
+                      } else {
+                        Fluttertoast.showToast(
+                          msg:
+                              res.message?.toString() ??
+                              'Failed to remove ban',
+                        );
+                      }
+                    } catch (_) {
+                      Fluttertoast.showToast(msg: 'Failed to remove ban');
+                    } finally {
+                      removing.remove(targetId);
+                    }
+                  }
+
+                  return Scaffold(
+                    backgroundColor: AppTheme.themed(
+                      pageCtx,
+                      0xFF121212,
+                      0xFFFAFAFE,
+                    ),
+                    appBar: AppBar(
+                      backgroundColor: AppTheme.themed(
+                        pageCtx,
+                        0xFF121212,
+                        0xFFFAFAFE,
                       ),
+                      elevation: 0,
+                      iconTheme: IconThemeData(color: AppTheme.fg(pageCtx)),
                       title: Text(
-                        name,
-                        style: TextStyle(color: AppTheme.fg(tileCtx, 0.87)),
-                      ),
-                      subtitle: Text(
-                        by.isNotEmpty ? 'Kicked by $by' : 'Kicked from room',
+                        'Kick History',
                         style: TextStyle(
-                          color: AppTheme.fg(tileCtx, 0.54),
-                          fontSize: 11,
+                          color: AppTheme.fg(pageCtx),
+                          fontSize: 18,
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                    body:
+                        history.isEmpty
+                            ? Center(
+                              child: Text(
+                                'No Kick History',
+                                style: TextStyle(
+                                  color: AppTheme.fg(pageCtx, 0.54),
+                                ),
+                              ),
+                            )
+                            : ListView.builder(
+                              itemCount: history.length,
+                              itemBuilder: (tileCtx, i) {
+                                final k =
+                                    history[i] is Map
+                                        ? Map<String, dynamic>.from(
+                                          history[i] as Map,
+                                        )
+                                        : <String, dynamic>{};
+                                final name =
+                                    k['name']?.toString() ?? 'User';
+                                final image = k['image']?.toString() ?? '';
+                                final by =
+                                    k['kickedByName']?.toString() ?? '';
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundImage:
+                                        image.isNotEmpty
+                                            ? CachedNetworkImageProvider(
+                                              image,
+                                            )
+                                            : null,
+                                    child:
+                                        image.isEmpty
+                                            ? const Icon(
+                                              Icons.person,
+                                              color: Colors.white,
+                                            )
+                                            : null,
+                                  ),
+                                  title: Text(
+                                    name,
+                                    style: TextStyle(
+                                      color: AppTheme.fg(tileCtx, 0.87),
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    by.isNotEmpty
+                                        ? 'Kicked by $by'
+                                        : 'Kicked from room',
+                                    style: TextStyle(
+                                      color: AppTheme.fg(tileCtx, 0.54),
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  trailing: TextButton(
+                                    onPressed: () => removeBan(k),
+                                    child: const Text(
+                                      'Remove Ban',
+                                      style: TextStyle(
+                                        color: Color(0xFF4DA3FF),
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                  );
+                },
               ),
         ),
       );

@@ -53,6 +53,16 @@ class RoomBanService {
     return Duration(hours: hours);
   }
 
+  /// Lift the ban for [roomId] — used when the host removes the kick from
+  /// Kick History (backend emits `viewerUnkicked` and the local guard must
+  /// be cleared so the user can rejoin immediately).
+  static Future<void> clearBan(String roomId) async {
+    if (roomId.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_banKey(roomId));
+    await prefs.remove(_kicksKey(roomId));
+  }
+
   /// Returns the remaining ban duration for [roomId], or null if the user is
   /// allowed to enter the room.
   static Future<Duration?> bannedRemaining(String roomId) async {

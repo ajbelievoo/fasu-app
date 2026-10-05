@@ -1,6 +1,10 @@
 import 'dart:async';
 
+import 'package:fluttertoast/fluttertoast.dart';
+
 import '../constants/const.dart';
+import '../services/room_ban_service.dart';
+import '../services/session_manager.dart';
 import '../services/socket_service.dart';
 import '../utils/log.dart';
 
@@ -531,6 +535,35 @@ class SocketHandlers {
     _unsubscribers.add(
       _socket.on(Const.eventRoomAdminList, (data) {
         _adminUpdateController.add(_unwrapMap(data) ?? <String, dynamic>{});
+      }),
+    );
+    // Host lifted this user's kick ban (Settings > Kick History > Remove
+    // Ban). Clear the local 2h/24h ban so they can rejoin immediately.
+    // Emitted both to the room and to globalRoom:<targetUserId>, so the
+    // kicked user receives it even while sitting on the home screen.
+    _unsubscribers.add(
+      _socket.on(Const.eventViewerUnkicked, (data) {
+        final map = _unwrapMap(data);
+        if (map == null) return;
+        final targetId =
+            map['targetUserId']?.toString() ??
+            map['kickedUserId']?.toString() ??
+            map['userId']?.toString() ??
+            map['viewerUserId']?.toString() ??
+            '';
+        final myId = SessionManager.instance?.userId ?? '';
+        if (targetId.isEmpty || myId.isEmpty || targetId != myId) return;
+        final roomKeys = <String>{
+          map['liveStreamingId']?.toString() ?? '',
+          map['roomId']?.toString() ?? '',
+          map['liveUserMongoId']?.toString() ?? '',
+        }..removeWhere((e) => e.isEmpty);
+        for (final key in roomKeys) {
+          RoomBanService.clearBan(key);
+        }
+        Fluttertoast.showToast(
+          msg: 'The host removed your ban — you can rejoin the room now',
+        );
       }),
     );
   }
