@@ -9,6 +9,7 @@ import 'package:in_app_update/in_app_update.dart';
 
 import 'constants/const.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:just_audio/just_audio.dart';
 import 'providers/ai_feature_manager.dart';
 import 'providers/auth_provider.dart';
 import 'providers/live_provider.dart';
@@ -408,6 +409,9 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
   IncomingCallData? _callData;
   bool _showBanner = false;
   Timer? _bannerTimeout;
+  // Foreground incoming-call ring — the banner itself is silent otherwise,
+  // so calls only rang when the app was backgrounded (notification channel).
+  AudioPlayer? _bannerRingPlayer;
   AppLifecycleState _lifecycle = AppLifecycleState.resumed;
 
   /// Check if the caller is in my block list. If so, auto-decline.
@@ -665,6 +669,7 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
   void _showForegroundBanner(Map<String, dynamic> map) {
     final callData = IncomingCallData.fromJson(map);
     _bannerTimeout?.cancel();
+    _startBannerRing();
     setState(() {
       _callData = callData;
       _showBanner = true;
@@ -692,6 +697,31 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
   /// Native heads-up notification with ring (background / lock screen).
   void _showBackgroundNotification(Map<String, dynamic> map) {
     PushNotificationService.showIncomingCallFromSocket(map);
+  }
+
+  /// Loop the ringtone while the foreground banner is up. Stops via
+  /// [_resetCallState] on accept / decline / cancel / disconnect / timeout.
+  Future<void> _startBannerRing() async {
+    try {
+      _bannerRingPlayer ??= AudioPlayer();
+      await _bannerRingPlayer!.setVolume(1.0);
+      await _bannerRingPlayer!.setLoopMode(LoopMode.one);
+      await _bannerRingPlayer!.setAsset('assets/sounds/ringtone.mp3');
+      await _bannerRingPlayer!.play();
+    } catch (e) {
+      Log.w(_tag, 'banner ringtone failed: $e');
+    }
+  }
+
+  void _stopBannerRing() {
+    final p = _bannerRingPlayer;
+    if (p == null) return;
+    try {
+      p.stop().then((_) => p.dispose()).catchError((_) {});
+    } catch (_) {
+      p.dispose();
+    }
+    _bannerRingPlayer = null;
   }
 
   void _acceptCall() {
@@ -745,6 +775,7 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
   /// reason (cancel / answer / disconnect / timeout). Keeps the global
   /// socket listeners alive so the next call can be handled.
   void _resetCallState() {
+    _stopBannerRing();
     _bannerTimeout?.cancel();
     _bannerTimeout = null;
     if (mounted) {
@@ -764,6 +795,7 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _bannerTimeout?.cancel();
+    _stopBannerRing();
     _cancelCallCancel?.call();
     _cancelCallAnswer?.call();
     _cancelCallDisconnect?.call();

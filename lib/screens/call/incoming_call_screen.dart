@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../../constants/const.dart';
 import '../../models/pk_call_models.dart';
 import '../../services/session_manager.dart';
+import '../../services/push_notification_service.dart';
 import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/log.dart';
@@ -56,6 +57,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
   void initState() {
     super.initState();
     _parseCallData();
+    PushNotificationService.cancelIncomingCallNotification();
     _setupAnimations();
     _startTimeout();
     _listenToSocket();

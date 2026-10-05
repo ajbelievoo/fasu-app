@@ -23,7 +23,7 @@ import '../utils/log.dart';
 /// Notification channel IDs — must match AndroidManifest / native app.
 const String _kChannelId = 'belive_notifications';
 const String _kChannelName = 'Belive Notifications';
-const String _kCallChannelId = 'belive_call_notifications';
+const String _kCallChannelId = 'belive_call_notifications_v2';
 const String _kCallChannelName = 'Belive Call Notifications';
 
 /// Unique notification IDs.
@@ -47,6 +47,8 @@ const AndroidNotificationChannel _callChannel = AndroidNotificationChannel(
   importance: Importance.high,
   playSound: true,
   sound: RawResourceAndroidNotificationSound('ringtone'),
+  audioAttributesUsage: AudioAttributesUsage.notificationRingtone,
+  enableVibration: true,
 );
 
 // ---- Pending call state (foreground only) --------------------------------
@@ -432,6 +434,7 @@ void _showIncomingCallNotification(Map<String, dynamic> callData) {
         autoCancel: true,
         playSound: true,
         sound: const RawResourceAndroidNotificationSound('ringtone'),
+        additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: loop ring
         // Full-screen intent so the call screen shows over the lock screen
         fullScreenIntent: true,
         shortcutId: 'call',
@@ -856,6 +859,13 @@ class PushNotificationService {
   /// Show a heads-up notification for an incoming call (from socket events).
   static void showIncomingCallFromSocket(Map<String, dynamic> callData) {
     _showIncomingCallNotification(callData);
+  }
+
+  /// Dismiss the pending incoming-call notification (e.g. when the
+  /// full-screen call UI opens — otherwise its insistent ringtone keeps
+  /// looping on top of the in-app ring).
+  static void cancelIncomingCallNotification() {
+    _cancelIncomingCallNotification();
   }
 
   /// Show a local notification for audio room penalty (host absent → beans
