@@ -1170,8 +1170,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           }
           if (kicksInWindow > 0 && lastKickMs > 0) {
             final banMs = kicksInWindow >= 3 ? 24 * 3600e3 : 2 * 3600e3;
-            final remMs =
-                lastKickMs + banMs - now.millisecondsSinceEpoch;
+            final remMs = lastKickMs + banMs - now.millisecondsSinceEpoch;
             serverBanned = remMs > 0;
             if (serverBanned) {
               remaining = Duration(milliseconds: remMs.round());
@@ -3564,8 +3563,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           // do NOT record another kick (a blocked re-entry attempt must not
           // extend the 2h window or push the count toward the 24h tier).
           _joinBlockedByKickBan = true;
-          final remMs =
-              (map['banRemainingMs'] as num?)?.round() ?? 0;
+          final remMs = (map['banRemainingMs'] as num?)?.round() ?? 0;
           if (mounted) {
             Fluttertoast.showToast(
               msg:
@@ -5160,7 +5158,8 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         if (!_isThisRoomEvent(map)) return;
         // `viewerCount` is the exact server count (host+invisible excluded);
         // legacy `view` includes the host, so subtract 1 on that path.
-        final vc = map['viewerCount'] as int? ?? int.tryParse('${map['viewerCount']}');
+        final vc =
+            map['viewerCount'] as int? ?? int.tryParse('${map['viewerCount']}');
         final view = map['view'] as int?;
         final resolved = vc ?? (view != null ? max(0, view - 1) : null);
         if (resolved != null && mounted) {
@@ -5357,7 +5356,8 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         final rawPosition = (map['position'] as num?)?.toInt();
         final senderId =
             (map['user'] is Map
-                    ? (map['user'] as Map)['userId'] ?? (map['user'] as Map)['_id']
+                    ? (map['user'] as Map)['userId'] ??
+                        (map['user'] as Map)['_id']
                     : null)
                 ?.toString() ??
             map['userId']?.toString();
@@ -5365,15 +5365,12 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         if (rawPosition == -2) {
           displayPosition = -1; // host overlay key
         } else if (rawPosition != null && rawPosition >= 0) {
-          final seat = _seats
-              .where((s) => s.position == rawPosition)
-              .firstOrNull;
+          final seat =
+              _seats.where((s) => s.position == rawPosition).firstOrNull;
           final senderSeatedHere =
               seat != null &&
               seat.isOccupied &&
-              (senderId == null ||
-                  senderId.isEmpty ||
-                  seat.userId == senderId);
+              (senderId == null || senderId.isEmpty || seat.userId == senderId);
           if (senderSeatedHere) {
             displayPosition = rawPosition;
           } else {
@@ -5382,9 +5379,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
             final senderSeat =
                 senderId == null
                     ? null
-                    : _seats
-                        .where((s) => s.userId == senderId)
-                        .firstOrNull;
+                    : _seats.where((s) => s.userId == senderId).firstOrNull;
             displayPosition =
                 (senderSeat != null && senderSeat.position >= 0)
                     ? senderSeat.position
@@ -7145,9 +7140,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       // the mute icon even though the backend seat[] has no -1 element.
       {
         final hostIdx = _seats.indexWhere(
-          (s) =>
-              (s.position == -1 || s.isHost) &&
-              s.userId == _hostUserId,
+          (s) => (s.position == -1 || s.isHost) && s.userId == _hostUserId,
         );
         if (hostIdx >= 0) {
           _seats[hostIdx].mute = updated.isHostMute;

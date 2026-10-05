@@ -240,6 +240,7 @@ class Const {
   static const String eventRequestRoomTheme = 'requestRoomTheme';
   static const String eventRoomTime = 'roomTime';
   static const String eventRequestRoomTime = 'requestRoomTime';
+
   /// Periodic host live-time heartbeat used by some backends. Kept separate
   /// from `roomTime` so both event names are supported.
   static const String eventLiveTimeSync = 'liveTimeSync';

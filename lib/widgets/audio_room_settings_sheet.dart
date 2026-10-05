@@ -733,8 +733,7 @@ class _AudioRoomSettingsPageState extends State<_AudioRoomSettingsPage> {
                         setSb(() {
                           history.removeWhere(
                             (e) =>
-                                e is Map &&
-                                e['userId']?.toString() == targetId,
+                                e is Map && e['userId']?.toString() == targetId,
                           );
                         });
                         if (history.isEmpty && sbCtx.mounted) {
@@ -743,8 +742,7 @@ class _AudioRoomSettingsPageState extends State<_AudioRoomSettingsPage> {
                       } else {
                         Fluttertoast.showToast(
                           msg:
-                              res.message?.toString() ??
-                              'Failed to remove ban',
+                              res.message?.toString() ?? 'Failed to remove ban',
                         );
                       }
                     } catch (_) {
@@ -795,18 +793,14 @@ class _AudioRoomSettingsPageState extends State<_AudioRoomSettingsPage> {
                                           history[i] as Map,
                                         )
                                         : <String, dynamic>{};
-                                final name =
-                                    k['name']?.toString() ?? 'User';
+                                final name = k['name']?.toString() ?? 'User';
                                 final image = k['image']?.toString() ?? '';
-                                final by =
-                                    k['kickedByName']?.toString() ?? '';
+                                final by = k['kickedByName']?.toString() ?? '';
                                 return ListTile(
                                   leading: CircleAvatar(
                                     backgroundImage:
                                         image.isNotEmpty
-                                            ? CachedNetworkImageProvider(
-                                              image,
-                                            )
+                                            ? CachedNetworkImageProvider(image)
                                             : null,
                                     child:
                                         image.isEmpty
