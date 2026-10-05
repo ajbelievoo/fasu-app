@@ -11935,8 +11935,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                           borderColor: Colors.redAccent,
                           textColor: const Color(0xFFFF6B6B),
                           onTap: () {
+                            // End directly — the tri-choice dialog already IS
+                            // the confirmation; a second "are you sure" popup
+                            // makes hosts tap through two dialogs every time.
                             Navigator.pop(ctx);
-                            _showEndLiveConfirmDialog();
+                            _endLiveAndShowSummary();
                           },
                         ),
                       ],
