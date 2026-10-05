@@ -98,11 +98,37 @@ class ChatScreen extends StatefulWidget {
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final label = _callStatusLabel(callStatus);
 
+    // Resolve the chat topic before emitting — a call can end without the
+    // chat screen ever having opened this session, so the in-memory cache is
+    // empty and a null topic would make the server silently drop the record
+    // (the missed-call entry then vanished from the inbox).
+    var topic = _ChatScreenState._topicCache[otherUserId];
+    if (topic == null || topic.isEmpty) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        topic = prefs.getString('${_ChatScreenState._prefKeyTopic}$otherUserId');
+      } catch (_) {}
+    }
+    if (topic == null || topic.isEmpty) {
+      try {
+        final topicRes = await ApiService.createChatTopic(
+          myUserId: myUserId,
+          otherUserId: otherUserId,
+        );
+        if (topicRes.topic != null && topicRes.topic!.isNotEmpty) {
+          topic = topicRes.topic;
+        }
+      } catch (_) {}
+    }
+    if (topic != null && topic.isNotEmpty) {
+      _ChatScreenState._topicCache[otherUserId] = topic;
+    }
+
     final msg = ChatItem(
       id: 'call_${now.millisecondsSinceEpoch}_$myUserId',
       senderId: myUserId,
       receiverId: otherUserId,
-      topic: _ChatScreenState._topicCache[otherUserId],
+      topic: topic,
       messageType: 'call',
       message: label,
       callType: callType,
@@ -131,7 +157,7 @@ class ChatScreen extends StatefulWidget {
     SocketService.instance.emit(Const.eventChat, {
       'senderId': myUserId,
       'receiverId': otherUserId,
-      'topic': _ChatScreenState._topicCache[otherUserId],
+      'topic': topic,
       'messageType': 'call',
       'callType': callType,
       'callDuration': callDuration,
@@ -776,7 +802,22 @@ class _ChatScreenState extends State<ChatScreen> {
         }
 
         // Keep only temp messages (unsent/sent but not confirmed by server yet)
-        final tempMsgs = _messages.where((m) => m.id == null).toList();
+        final tempMsgs = _messages.where((m) {
+          if (m.id == null) return true;
+          // Locally-added call logs use a `call_` pseudo-id — keep them only
+          // when the server copy isn't in this page, so a log whose socket
+          // emit died doesn't vanish from the list.
+          if (m.id!.startsWith('call_')) {
+            return !apiMsgs.any(
+              (a) =>
+                  a.messageType == 'call' &&
+                  a.senderId == m.senderId &&
+                  a.message == m.message &&
+                  a.callDuration == m.callDuration,
+            );
+          }
+          return false;
+        }).toList();
 
         // Replace full history with fresh server data + existing temp messages
         _messages
@@ -912,17 +953,41 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       final msg = ChatItem.fromJson(map);
+
+      // `chat` is emitted to globalRoom:<userId> — events for OTHER
+      // conversations arrive on this socket too. Drop anything that doesn't
+      // involve this chat partner (or, when both sides know the topic, a
+      // different topic entirely) or foreign DMs leak into the open screen.
+      // The server now echoes the authoritative topic — adopt it when ours
+      // is missing (e.g. createChatTopic failed at init) so history loads
+      // and subsequent emits carry the right id.
+      if (_topic == null && msg.topic != null && msg.topic!.isNotEmpty) {
+        _topic = msg.topic;
+        _topicCache[widget.otherUserId] = msg.topic!;
+        unawaited(_loadHistory());
+      }
+      final involvesThisChat =
+          msg.senderId == widget.otherUserId ||
+          msg.receiverId == widget.otherUserId;
+      final topicMismatch =
+          _topic != null && msg.topic != null && msg.topic != _topic;
+      if (!involvesThisChat || topicMismatch) return;
+
       final isFromMe = msg.senderId == _myUserId;
 
       if (isFromMe && msg.id != null) {
         // Server echo: replace the temp message (without id) with the server message.
         // Match by sender + message content only (NOT time, since server may
-        // format timestamps differently than the client).
+        // format timestamps differently than the client). Locally-added call
+        // logs carry a `call_` pseudo-id — match those too or the server copy
+        // lands as a duplicate bubble.
+        final isTempId = (String? id) => id == null || id.startsWith('call_');
         for (int i = _messages.length - 1; i >= 0; i--) {
           final existing = _messages[i];
-          if (existing.id == null &&
+          if (isTempId(existing.id) &&
               existing.senderId == _myUserId &&
-              existing.message == msg.message) {
+              existing.message == msg.message &&
+              existing.messageType == msg.messageType) {
             // Apply pending status if any
             final pendingStatus = _pendingMessageStatus.remove(msg.id);
             // For MY messages, don't trust server's isRead/status='read'.
@@ -950,6 +1015,10 @@ class _ChatScreenState extends State<ChatScreen> {
               giftCoin: msg.giftCoin,
               audioUrl: msg.audioUrl,
               audioDuration: msg.audioDuration,
+              callType: msg.callType,
+              callDuration: msg.callDuration,
+              callStatus: msg.callStatus,
+              liveData: msg.liveData,
               replyToId: msg.replyToId,
               replyToMessage: msg.replyToMessage,
               replyToSenderName: msg.replyToSenderName,

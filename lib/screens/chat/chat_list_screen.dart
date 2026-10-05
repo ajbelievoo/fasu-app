@@ -129,6 +129,35 @@ class _ChatListScreenState extends State<ChatListScreen> {
     });
   }
 
+
+  /// Inbox row preview text. Call records carry the status label plus the
+  /// duration when the call connected — the raw `message` alone hid that.
+  String _previewText(ChatUserItem c) {
+    if (c.messageType == 'call') {
+      final label =
+          c.message != null && c.message!.isNotEmpty
+              ? c.message!
+              : (c.callStatus == 'missed'
+                  ? 'Missed call'
+                  : c.callStatus == 'declined'
+                  ? 'Declined call'
+                  : c.callStatus == 'cancelled'
+                  ? 'Cancelled call'
+                  : c.callStatus == 'received'
+                  ? 'Call received'
+                  : 'Call ended');
+      final d = c.callDuration;
+      if (d > 0) {
+        final mm = d ~/ 60;
+        final ss = d % 60;
+        final dur = mm > 0 ? '${mm}m ${ss}s' : '${ss}s';
+        return '$label · $dur';
+      }
+      return label;
+    }
+    return c.message ?? 'Tap to chat';
+  }
+
   void _updateOnlineStatus(String userId, bool online) {
     final chatProvider = context.read<ChatProvider>();
     bool changed = false;
@@ -717,11 +746,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
           subtitle: Row(
             children: [
+              if (!isLive && c.messageType == 'call')
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: Icon(
+                    c.callType == 'video' ? Icons.videocam : Icons.call,
+                    size: 15,
+                    color:
+                        (c.callStatus == 'missed' || c.callStatus == 'declined')
+                            ? Colors.redAccent
+                            : Colors.green,
+                  ),
+                ),
               Expanded(
                 child: Text(
                   isLive
                       ? '🔴 ${c.name ?? 'User'} is live now — tap to join'
-                      : (c.message ?? 'Tap to chat'),
+                      : _previewText(c),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

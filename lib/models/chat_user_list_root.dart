@@ -48,6 +48,10 @@ class ChatUserItem {
     this.avatarFrameImage,
     this.wallpaper,
     this.disappearingSeconds = 0,
+    this.messageType,
+    this.callType,
+    this.callStatus,
+    this.callDuration = 0,
     // local-only state
     this.selected = false,
     this.pinned = false,
@@ -64,6 +68,13 @@ class ChatUserItem {
   final String? message;
   final String? time;
   final String? chatDate;
+
+  /// Last message type (message | call | gift | voice | image | liveShare…)
+  /// plus call metadata — lets the inbox row render a call icon + duration.
+  final String? messageType;
+  final String? callType;
+  final String? callStatus;
+  final int callDuration;
   final int unreadCount;
   bool isOnline;
   final bool isVIP;
@@ -157,6 +168,10 @@ class ChatUserItem {
       pinned: parseBool(json['isPinned'] ?? json['pinned'] ?? chatMap?['isPinned'] ?? chatMap?['pinned']),
       archived: parseBool(json['isArchived'] ?? json['archived'] ?? chatMap?['isArchived'] ?? chatMap?['archived']),
       muted: parseBool(json['isMuted'] ?? json['muted'] ?? chatMap?['isMuted'] ?? chatMap?['muted']),
+      messageType: parseString(json['messageType'] ?? chatMap?['messageType']),
+      callType: parseString(json['callType'] ?? chatMap?['callType']),
+      callStatus: parseString(json['callStatus'] ?? chatMap?['callStatus']),
+      callDuration: parseInt(json['callDuration'] ?? chatMap?['callDuration'], 0),
     );
   }
 }

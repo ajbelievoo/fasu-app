@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../constants/const.dart';
 import '../utils/log.dart';
+import 'session_manager.dart';
 
 /// Ported from native `RetrofitBuilder.java`.
 ///
@@ -15,6 +16,7 @@ class ApiClient {
   ApiClient._();
 
   static String? _authToken;
+  static Future<bool>? _healInFlight;
 
   /// Set the bearer token used for authenticated requests.
   static void setAuthToken(String? token) {
@@ -22,6 +24,79 @@ class ApiClient {
   }
 
   static String? getAuthToken() => _authToken;
+
+  /// Silently re-issue a session JWT via /user/loginSignup using whatever
+  /// account identifiers the stored profile still has (mobile, email,
+  /// googleEmail — the backend resolves by any one of them). Sessions that
+  /// predate JWTs or whose token was wiped heal on the next 401 instead of
+  /// hard-failing every protected endpoint until re-login.
+  ///
+  /// Concurrent 401s share a single in-flight heal.
+  static Future<bool> healSessionToken() {
+    return _healInFlight ??= _doHealSessionToken().whenComplete(
+      () => _healInFlight = null,
+    );
+  }
+
+  static Future<bool> _doHealSessionToken() async {
+    try {
+      final u = SessionManager.instance?.getUser();
+      if (u == null) return false;
+      final body = <String, dynamic>{
+        'loginType': u.loginType ?? 0,
+        'fcmToken': u.fcmToken ?? '',
+        if ((u.mobileNumber ?? '').isNotEmpty) 'mobileNumber': u.mobileNumber,
+        if ((u.googleEmail ?? '').isNotEmpty) 'googleEmail': u.googleEmail,
+        if ((u.email ?? '').isNotEmpty) 'email': u.email,
+        if ((u.identity ?? '').isNotEmpty) 'identity': u.identity,
+      };
+      final hasIdentifier = const [
+        'mobileNumber',
+        'googleEmail',
+        'email',
+      ].any(body.containsKey);
+      if (!hasIdentifier) return false;
+
+      // Raw client — bypasses the auth interceptor entirely so the heal can
+      // never recurse into itself.
+      final raw = Dio(
+        BaseOptions(
+          baseUrl: Const.baseUrl,
+          connectTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 20),
+          headers: {'key': Const.apiKey, 'Accept': 'application/json'},
+          responseType: ResponseType.json,
+        ),
+      );
+      try {
+        final res = await raw.post('/user/loginSignup', data: body);
+        final data = res.data;
+        final userMap = data is Map ? data['user'] : null;
+        final token = userMap is Map ? userMap['token'] : null;
+        final healedId = userMap is Map ? (userMap['_id'] ?? userMap['id']) : null;
+        // loginSignup CREATES a user when no identifier matches — a stale
+        // stored email/mobile would mint a fresh account and silently steal
+        // the session. Only adopt the token when it came back for the same
+        // user id we already hold.
+        if (token is String &&
+            token.isNotEmpty &&
+            healedId?.toString() == u.id) {
+          setAuthToken(token);
+          SessionManager.instance?.saveUser(u.copyWith(token: token));
+          return true;
+        }
+        Log.w(
+          'AuthInterceptor',
+          'heal returned different user (${healedId} != ${u.id}) — refusing',
+        );
+      } finally {
+        raw.close();
+      }
+    } catch (e) {
+      Log.w('AuthInterceptor', 'token heal failed: $e');
+    }
+    return false;
+  }
 
   /// Default client used by [ApiService] for regular JSON requests.
   static Dio create() {
@@ -37,7 +112,7 @@ class ApiClient {
     // Certificate pinning for the main API server
     _attachCertificatePinning(dio);
 
-    dio.interceptors.add(_AuthInterceptor());
+    dio.interceptors.add(_AuthInterceptor(dio));
     if (kDebugMode) {
       dio.interceptors.add(LogInterceptor(
         request: true,
@@ -68,7 +143,7 @@ class ApiClient {
       responseType: ResponseType.json,
     ));
 
-    dio.interceptors.add(_AuthInterceptor());
+    dio.interceptors.add(_AuthInterceptor(dio));
     _attachCertificatePinning(dio);
     if (kDebugMode) {
       dio.interceptors.add(LogInterceptor(
@@ -156,6 +231,8 @@ class ApiClient {
 ///
 /// Ported from native `AuthInterceptor.java`.
 class _AuthInterceptor extends Interceptor {
+  _AuthInterceptor(this._dio);
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final token = ApiClient.getAuthToken();
@@ -167,13 +244,34 @@ class _AuthInterceptor extends Interceptor {
     handler.next(options);
   }
 
+  final Dio _dio;
+
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    // If we get a 401, clear the auth token so subsequent requests don't
-    // keep sending a stale token.
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
-      Log.w('AuthInterceptor', '401 received — clearing auth token');
+      // Clear the stale token so later requests don't keep sending it.
       ApiClient.setAuthToken(null);
+      // Transparent heal + single retry: a missing/wiped session JWT used to
+      // hard-fail chat list, audio-room join, wallet, etc. until re-login.
+      if (err.requestOptions.extra['_authRetried'] != true &&
+          !err.requestOptions.path.contains('loginSignup')) {
+        Log.w(
+          'AuthInterceptor',
+          '401 on ${err.requestOptions.path} — healing session token',
+        );
+        if (await ApiClient.healSessionToken()) {
+          try {
+            final opts = err.requestOptions;
+            opts.extra['_authRetried'] = true;
+            opts.headers['Authorization'] =
+                'Bearer ${ApiClient.getAuthToken()}';
+            final res = await _dio.fetch(opts);
+            return handler.resolve(res);
+          } catch (e) {
+            Log.w('AuthInterceptor', 'post-heal retry failed: $e');
+          }
+        }
+      }
     }
     handler.next(err);
   }

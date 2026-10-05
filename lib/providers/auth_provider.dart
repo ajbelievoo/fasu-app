@@ -408,8 +408,18 @@ class AuthProvider extends ChangeNotifier {
     try {
       final res = await ApiService.createUser(body);
       if (res.status && res.user != null) {
-        _persistUser(res.user!);
-        Log.d(_tag, 'ensureAuthToken: token refreshed silently');
+        // loginSignup CREATES a user when no identifier matches — a stale
+        // stored email/mobile would mint a fresh account and steal the
+        // session. Only adopt the response when it's the same user id.
+        if (res.user!.id == u.id) {
+          _persistUser(res.user!);
+          Log.d(_tag, 'ensureAuthToken: token refreshed silently');
+        } else {
+          Log.w(
+            _tag,
+            'ensureAuthToken: heal returned different user (${res.user!.id} != ${u.id}) — refusing',
+          );
+        }
       } else {
         Log.w(_tag, 'ensureAuthToken: loginSignup refused (${res.message})');
       }
