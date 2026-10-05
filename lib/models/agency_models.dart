@@ -94,6 +94,7 @@ class Agency {
     this.mobile,
     this.bdId,
     this.totalAgencyWiseHost = 0,
+    this.loginString,
   });
 
   final String? id;
@@ -133,6 +134,7 @@ class Agency {
   final String? mobile;
   final String? bdId;
   final int totalAgencyWiseHost;
+  final String? loginString;
 
   factory Agency.fromJson(Map<String, dynamic> json) => Agency(
         id: parseString(json['_id'] ?? json['id']),
@@ -171,6 +173,7 @@ class Agency {
         mobile: parseString(json['mobile']),
         bdId: parseString(json['bd']),
         totalAgencyWiseHost: parseInt(json['totalAgencyWiseHost'], 0),
+        loginString: parseString(json['loginString']),
       );
 }
 
@@ -241,6 +244,15 @@ class AgencyHost {
     this.liveHours = 0,
     this.isOnline = false,
     this.joinedAt,
+    this.uniqueId,
+    this.country,
+    this.countryFlagImage,
+    this.rCoin = 0,
+    this.mobileNumber,
+    this.bio,
+    this.followers = 0,
+    this.isBlock = false,
+    this.liveType,
   });
 
   final String? id;
@@ -252,9 +264,18 @@ class AgencyHost {
   final int diamond;
   final int revenue;
   final int balance;
-  final int liveHours;
+  final num liveHours;
   final bool isOnline;
   final String? joinedAt;
+  final dynamic uniqueId;
+  final String? country;
+  final String? countryFlagImage;
+  final int rCoin;
+  final String? mobileNumber;
+  final String? bio;
+  final int followers;
+  final bool isBlock;
+  final dynamic liveType;
 
   factory AgencyHost.fromJson(Map<String, dynamic> json) => AgencyHost(
         id: parseString(json['_id'] ?? json['id']),
@@ -266,9 +287,18 @@ class AgencyHost {
         diamond: parseInt(json['diamond'], 0),
         revenue: parseInt(json['revenue'], 0),
         balance: parseInt(json['balance'], 0),
-        liveHours: parseInt(json['liveHours'], 0),
+        liveHours: parseNum(json['liveHours'], 0),
         isOnline: parseBool(json['isOnline']),
         joinedAt: parseString(json['joinedAt'] ?? json['createdAt']),
+        uniqueId: json['uniqueId'],
+        country: parseString(json['country']),
+        countryFlagImage: parseString(json['countryFlagImage']),
+        rCoin: parseInt(json['rCoin'], 0),
+        mobileNumber: parseString(json['mobileNumber']),
+        bio: parseString(json['bio']),
+        followers: parseInt(json['followers'], 0),
+        isBlock: parseBool(json['isBlock']),
+        liveType: json['liveType'],
       );
 }
 

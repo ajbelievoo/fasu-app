@@ -3308,6 +3308,18 @@ class ApiService {
     return RestResponse.fromJson(_asMap(r.data));
   }
 
+  /// Change the agency panel password — bound to the app user's JWT.
+  static Future<RestResponse> changeAgencyPassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    final r = await _dio.patch(
+      '/agency/changePasswordApp',
+      data: {'oldPassword': oldPassword, 'newPassword': newPassword},
+    );
+    return RestResponse.fromJson(_asMap(r.data));
+  }
+
   /// Get BD for a given agency code.
   static Future<Map<String, dynamic>> getBdForAgency(String bdCode) async {
     final r = await _dio.get(

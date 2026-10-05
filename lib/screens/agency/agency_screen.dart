@@ -11,9 +11,11 @@
 library agency;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/agency_models.dart';
 import '../../models/json_annotation_helper.dart';
@@ -240,18 +242,18 @@ class _DashboardHeader extends StatelessWidget {
           Row(
             children: [
               _StatBlock(
-                label: 'Current Diamonds',
-                value: formatCount(agency.currentCoin),
-                icon: Icons.diamond,
+                label: 'Current Beans',
+                value: '${formatCount(agency.currentCoin)} 🫘',
+                icon: Icons.eco,
               ),
               _StatBlock(
-                label: 'Host Diamonds',
-                value: formatCount(agency.currentHostCoin),
+                label: 'Host Beans',
+                value: '${formatCount(agency.currentHostCoin)} 🫘',
                 icon: Icons.groups,
               ),
               _StatBlock(
-                label: 'Total Diamonds',
-                value: formatCount(agency.totalCoin),
+                label: 'Total Beans',
+                value: '${formatCount(agency.totalCoin)} 🫘',
                 icon: Icons.trending_up,
               ),
             ],
@@ -261,12 +263,12 @@ class _DashboardHeader extends StatelessWidget {
             children: [
               _StatBlock(
                 label: 'Withdrawn',
-                value: formatCount(agency.totalWithdrawalCoin),
+                value: '${formatCount(agency.totalWithdrawalCoin)} 🫘',
                 icon: Icons.download,
               ),
               _StatBlock(
                 label: 'Pending',
-                value: formatCount(agency.pendingWithdrawableRequestCoin),
+                value: '${formatCount(agency.pendingWithdrawableRequestCoin)} 🫘',
                 icon: Icons.pending,
               ),
               _StatBlock(
@@ -386,12 +388,27 @@ class _OverviewTab extends StatelessWidget {
               onTap: () => _showEditAgencyDialog(context),
             ),
             _ActionCard(
+              icon: Icons.link,
+              label: 'Panel Link',
+              gradient: AppTheme.blueGradient,
+              onTap: () => _openOrCopyPanelLink(context, agency.loginString),
+            ),
+            _ActionCard(
+              icon: Icons.lock,
+              label: 'Password',
+              gradient: AppTheme.pinkGradient,
+              onTap: () => _showChangePasswordSheet(context),
+            ),
+            _ActionCard(
               icon: Icons.share,
               label: 'Share Code',
-              gradient: AppTheme.blueGradient,
+              gradient: AppTheme.greenGradient,
               onTap: () {
+                Clipboard.setData(
+                  ClipboardData(text: agency.code?.toString() ?? ''),
+                );
                 Fluttertoast.showToast(
-                  msg: 'Agency code: ${agency.code ?? "N/A"}',
+                  msg: 'Agency code copied: ${agency.code ?? "N/A"}',
                 );
               },
             ),
@@ -420,6 +437,11 @@ class _OverviewTab extends StatelessWidget {
                 value: agency.uniqueId?.toString() ?? 'N/A',
               ),
               Divider(color: AppTheme.hairline(context)),
+              _LinkInfoRow(
+                label: 'Agency Panel Link',
+                url: agency.loginString ?? '',
+              ),
+              Divider(color: AppTheme.hairline(context)),
               _InfoRow(label: 'Mobile', value: agency.mobile ?? 'N/A'),
               Divider(color: AppTheme.hairline(context)),
               _InfoRow(
@@ -443,6 +465,137 @@ class _OverviewTab extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _openOrCopyPanelLink(BuildContext context, String? url) async {
+    if (url == null || !url.startsWith('http')) {
+      Fluttertoast.showToast(msg: 'Panel link not available yet');
+      return;
+    }
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok) throw StateError('launch failed');
+    } catch (_) {
+      Clipboard.setData(ClipboardData(text: url));
+      Fluttertoast.showToast(msg: 'Link copied — paste in a browser');
+    }
+  }
+
+  void _showChangePasswordSheet(BuildContext context) {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool saving = false;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.cardBg(ctx),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Change Panel Password',
+                  style: TextStyle(
+                    color: AppTheme.fg(ctx),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'This changes the password for the agency web panel.',
+                  style: TextStyle(color: AppTheme.fg(ctx, 0.54), fontSize: 12),
+                ),
+                const SizedBox(height: 14),
+                _pwdField(ctx, oldCtrl, 'Current password'),
+                const SizedBox(height: 10),
+                _pwdField(ctx, newCtrl, 'New password (min 6 chars)'),
+                const SizedBox(height: 10),
+                _pwdField(ctx, confirmCtrl, 'Confirm new password'),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: saving
+                        ? null
+                        : () async {
+                            if (newCtrl.text.trim().length < 6) {
+                              Fluttertoast.showToast(msg: 'Min 6 characters');
+                              return;
+                            }
+                            if (newCtrl.text.trim() != confirmCtrl.text.trim()) {
+                              Fluttertoast.showToast(msg: 'Passwords do not match');
+                              return;
+                            }
+                            setS(() => saving = true);
+                            try {
+                              final res = await ApiService.changeAgencyPassword(
+                                oldPassword: oldCtrl.text.trim(),
+                                newPassword: newCtrl.text.trim(),
+                              );
+                              Fluttertoast.showToast(
+                                msg: res.message ?? (res.status ? 'Password updated' : 'Failed'),
+                              );
+                              if (res.status && ctx.mounted) Navigator.pop(ctx);
+                            } catch (_) {
+                              Fluttertoast.showToast(msg: 'Failed to update password');
+                            } finally {
+                              if (ctx.mounted) setS(() => saving = false);
+                            }
+                          },
+                    child: saving
+                        ? const SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Update Password'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _pwdField(BuildContext ctx, TextEditingController c, String hint) {
+    return TextField(
+      controller: c,
+      obscureText: true,
+      style: TextStyle(color: AppTheme.fg(ctx)),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: AppTheme.fg(ctx, 0.3)),
+        filled: true,
+        fillColor: AppTheme.themed(ctx, 0xFF1E1E1E, 0xFFF1F1FA),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      ),
     );
   }
 
@@ -571,7 +724,7 @@ class _CommissionRatesDialogState extends State<_CommissionRatesDialog> {
                       title: Text(
                         upper == 0
                             ? 'Base rate'
-                            : 'Above ${formatCount(parseInt(upper))} diamonds',
+                            : 'Above ${formatCount(parseInt(upper))} beans',
                       ),
                       subtitle: Text(
                         '$pct% commission',
@@ -915,6 +1068,86 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
+/// Tappable link row — opens the agency web panel in the browser and offers
+/// a copy affordance so it can be shared with co-managers.
+class _LinkInfoRow extends StatelessWidget {
+  const _LinkInfoRow({required this.label, required this.url});
+  final String label;
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = url.startsWith('http');
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(color: AppTheme.fg(context, 0.54), fontSize: 13),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                valid
+                    ? GestureDetector(
+                      onTap: () async {
+                        final uri = Uri.tryParse(url);
+                        if (uri == null) return;
+                        try {
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
+                        } catch (_) {
+                          Fluttertoast.showToast(msg: 'Could not open link');
+                        }
+                      },
+                      child: Text(
+                        url,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF4F8DFD),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          decoration: TextDecoration.underline,
+                          decorationColor: Color(0xFF4F8DFD),
+                        ),
+                      ),
+                    )
+                    : Text(
+                      'N/A',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        color: AppTheme.fg(context),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+          ),
+          if (valid) ...[
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: url));
+                Fluttertoast.showToast(msg: 'Panel link copied');
+              },
+              child: Icon(
+                Icons.copy,
+                color: AppTheme.fg(context, 0.54),
+                size: 16,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 /// Hosts tab â€” list of agency hosts with revenue.
 class _HostsTab extends StatefulWidget {
   const _HostsTab({required this.agencyId});
@@ -967,7 +1200,9 @@ class _HostsTabState extends State<_HostsTab> {
         itemCount: _hosts.length,
         itemBuilder: (_, i) {
           final h = _hosts[i];
-          return Container(
+          return GestureDetector(
+            onTap: () => _showHostDetail(context, h),
+            child: Container(
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -1005,7 +1240,7 @@ class _HostsTabState extends State<_HostsTab> {
                         ],
                       ),
                       Text(
-                        '@${h.username ?? ''} â€¢ ${h.liveHours}h live',
+                        'ID: ${h.uniqueId ?? h.username ?? '-'} â€¢ ${h.country ?? ''} â€¢ ${h.liveHours}h live',
                         style: TextStyle(
                           color: AppTheme.fg(context, 0.54),
                           fontSize: 12,
@@ -1019,12 +1254,12 @@ class _HostsTabState extends State<_HostsTab> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.diamond, size: 14, color: Colors.cyan),
+                        const Icon(Icons.eco, size: 14, color: Color(0xFF7CFC9A)),
                         const SizedBox(width: 4),
                         Text(
-                          formatCount(h.revenue),
+                          '${formatCount(h.revenue)} beans',
                           style: const TextStyle(
-                            color: Colors.cyan,
+                            color: Color(0xFF7CFC9A),
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
@@ -1032,7 +1267,7 @@ class _HostsTabState extends State<_HostsTab> {
                       ],
                     ),
                     Text(
-                      'Bal: ${formatCount(h.balance)}',
+                      'Bal: ${formatCount(h.balance)} beans',
                       style: TextStyle(
                         color: AppTheme.fg(context, 0.54),
                         fontSize: 11,
@@ -1048,12 +1283,18 @@ class _HostsTabState extends State<_HostsTab> {
                   itemBuilder:
                       (_) => [
                         const PopupMenuItem(
+                          value: 'details',
+                          child: Text('View Details'),
+                        ),
+                        const PopupMenuItem(
                           value: 'remove',
                           child: Text('Remove Host'),
                         ),
                       ],
                   onSelected: (v) async {
-                    if (v == 'remove') {
+                    if (v == 'details') {
+                      _showHostDetail(context, h);
+                    } else if (v == 'remove') {
                       final res = await ApiService.removeAgencyHost(
                         agencyId: widget.agencyId,
                         hostUserId: h.userId ?? '',
@@ -1067,10 +1308,127 @@ class _HostsTabState extends State<_HostsTab> {
                 ),
               ],
             ),
+            ),
           );
         },
       ),
     );
+  }
+
+  /// Full host detail sheet — every field the agency needs to see.
+  void _showHostDetail(BuildContext context, AgencyHost h) {
+    String liveTypeName = switch (h.liveType) {
+      1 => 'Audio', 2 => 'Video', 3 => 'Audio + Video', _ => '-',
+    };
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(ctx).size.height * 0.75,
+        ),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppTheme.cardBg(ctx),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Row(
+              children: [
+                UserAvatar(imageUrl: h.image, size: 56, isVIP: false),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        h.name ?? 'Host',
+                        style: TextStyle(
+                          color: AppTheme.fg(ctx),
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        h.isOnline ? '● Online' : 'Offline',
+                        style: TextStyle(
+                          color: h.isOnline ? Colors.green : AppTheme.fg(ctx, 0.54),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (h.isBlock)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'BLOCKED',
+                      style: TextStyle(color: Colors.red, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _detailRow(ctx, 'Unique ID', h.uniqueId?.toString() ?? '-'),
+            _detailRow(ctx, 'Username', h.username ?? '-'),
+            _detailRow(ctx, 'Country', h.country ?? '-'),
+            _detailRow(ctx, 'Mobile', h.mobileNumber?.isNotEmpty == true ? h.mobileNumber! : '-'),
+            _detailRow(ctx, 'Live Type', liveTypeName),
+            _detailRow(ctx, 'Beans Earned (income)', '${formatCount(h.rCoin)} beans'),
+            _detailRow(ctx, 'Diamonds (purchased)', '${formatCount(h.coin)} 💎'),
+            _detailRow(ctx, 'Live Hours', '${h.liveHours}h'),
+            _detailRow(ctx, 'Followers', formatCount(h.followers)),
+            _detailRow(ctx, 'Joined', _fmtDate(h.joinedAt)),
+            if (h.bio?.isNotEmpty == true) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Bio',
+                style: TextStyle(color: AppTheme.fg(ctx, 0.54), fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                h.bio!,
+                style: TextStyle(color: AppTheme.fg(ctx), fontSize: 13),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  static Widget _detailRow(BuildContext ctx, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: AppTheme.fg(ctx, 0.54), fontSize: 13)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: TextStyle(color: AppTheme.fg(ctx), fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _fmtDate(String? iso) {
+    if (iso == null || iso.isEmpty) return '-';
+    final d = DateTime.tryParse(iso);
+    if (d == null) return iso;
+    return '${d.day}/${d.month}/${d.year}';
   }
 }
 
@@ -1155,7 +1513,7 @@ class _RevenueTabState extends State<_RevenueTab> {
             children: [
               Expanded(
                 child: _SummaryCard(
-                  label: 'Total Revenue',
+                  label: 'Revenue (Beans)',
                   value: formatCount(_data!.totalRevenue),
                   icon: Icons.trending_up,
                   gradient: AppTheme.greenGradient,
@@ -1164,7 +1522,7 @@ class _RevenueTabState extends State<_RevenueTab> {
               const SizedBox(width: 8),
               Expanded(
                 child: _SummaryCard(
-                  label: 'Commission',
+                  label: 'Commission (Beans)',
                   value: formatCount(_data!.totalCommission),
                   icon: Icons.percent,
                   gradient: AppTheme.goldGradient,
@@ -1173,7 +1531,7 @@ class _RevenueTabState extends State<_RevenueTab> {
               const SizedBox(width: 8),
               Expanded(
                 child: _SummaryCard(
-                  label: 'Host Payout',
+                  label: 'Host Payout (Beans)',
                   value: formatCount(_data!.totalHostPayout),
                   icon: Icons.payments,
                   gradient: AppTheme.pinkGradient,
@@ -1211,12 +1569,12 @@ class _RevenueTabState extends State<_RevenueTab> {
                     ),
                     Row(
                       children: [
-                        const Icon(Icons.diamond, size: 14, color: Colors.cyan),
+                        const Icon(Icons.eco, size: 14, color: Color(0xFF7CFC9A)),
                         const SizedBox(width: 4),
                         Text(
-                          formatCount(e.revenue),
+                          '${formatCount(e.revenue)} beans',
                           style: const TextStyle(
-                            color: Colors.cyan,
+                            color: Color(0xFF7CFC9A),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1363,7 +1721,7 @@ class _WithdrawalTabState extends State<_WithdrawalTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          formatCount(w.amount),
+                          '${formatCount(w.amount)} beans',
                           style: TextStyle(
                             color: AppTheme.fg(context),
                             fontWeight: FontWeight.bold,
@@ -1694,9 +2052,9 @@ class _AgencyWithdrawScreenState extends State<AgencyWithdrawScreen> {
                     ),
                     const SizedBox(height: 16),
                     _field(
-                      'Amount',
+                      'Amount (beans)',
                       _amountCtrl,
-                      'Enter amount',
+                      'Enter beans amount',
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 16),
