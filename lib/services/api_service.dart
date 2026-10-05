@@ -635,7 +635,22 @@ class ApiService {
     final list = searchData['data'] as List? ?? [];
     if (list.isEmpty) return null;
 
-    final userId = (list[0] as Map<String, dynamic>)['_id']?.toString();
+    // The server regex-matches uniqueId substrings — pick the row whose
+    // uniqueId exactly equals what the seller typed, otherwise a partial
+    // match could send the coins to the wrong user.
+    Map<String, dynamic>? match;
+    final wanted = uniqueId.trim();
+    for (final raw in list) {
+      if (raw is! Map) continue;
+      final row = Map<String, dynamic>.from(raw);
+      if (row['uniqueId']?.toString() == wanted) {
+        match = row;
+        break;
+      }
+    }
+    match ??= Map<String, dynamic>.from(list[0] as Map);
+
+    final userId = match['_id']?.toString();
     if (userId == null || userId.isEmpty) return null;
 
     final profile = await getGuestProfile(userId);

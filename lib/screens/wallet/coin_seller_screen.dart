@@ -281,9 +281,18 @@ class _SellerRechargeTabState extends State<_SellerRechargeTab> {
       return;
     }
 
+    // Never fall back to the user id — the endpoint expects the CoinSeller
+    // document _id; using the user id silently 404s as "CoinSeller not found".
+    final sellerId = _sellerData?.id;
+    if (sellerId == null || sellerId.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'Seller profile not loaded — pull to refresh and retry',
+      );
+      _loadBalance();
+      return;
+    }
+
     setState(() => _toppingUp = true);
-    final session = context.read<SessionManager>();
-    final sellerId = _sellerData?.id ?? session.userId;
     final targetUniqueId = _foundUser!.uniqueId ?? '';
     final idempotencyKey =
         'coin_seller_${sellerId}_${targetUniqueId}_${DateTime.now().microsecondsSinceEpoch}';
