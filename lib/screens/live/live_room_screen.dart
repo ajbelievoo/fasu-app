@@ -40,6 +40,7 @@ import '../../models/audio_room_root.dart';
 import '../../models/json_annotation_helper.dart';
 import '../../models/pk_call_models.dart';
 import '../../models/setting_root.dart' show Setting;
+import '../../models/user_root.dart' show User;
 import '../../providers/ai_feature_manager.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/minimized_live_provider.dart';
@@ -2983,15 +2984,24 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                 : (map['user'] is Map
                     ? Map<String, dynamic>.from(map['user'] as Map)
                     : <String, dynamic>{});
-        final userName =
-            map['name']?.toString() ??
-            map['userName']?.toString() ??
-            map['username']?.toString() ??
-            map['senderName']?.toString() ??
-            userMap['name']?.toString() ??
-            userMap['userName']?.toString() ??
-            userMap['username']?.toString() ??
-            'User';
+        // `??` alone can't skip empty names — accounts with `name:""`
+        // (seen on VIP users) carry the display name in `username`.
+        String pickName(dynamic v) =>
+            (v?.toString().trim().isNotEmpty == true &&
+                    v.toString().trim().toLowerCase() != 'user')
+                ? v.toString().trim()
+                : '';
+        final resolvedName = [
+          pickName(map['name']),
+          pickName(map['userName']),
+          pickName(map['username']),
+          pickName(map['senderName']),
+          pickName(map['senderUserName']),
+          pickName(userMap['name']),
+          pickName(userMap['userName']),
+          pickName(userMap['username']),
+        ].firstWhere((v) => v.isNotEmpty, orElse: () => '');
+        final userName = resolvedName.isNotEmpty ? resolvedName : 'User';
         final imageUrl = map['imageUrl']?.toString() ?? '';
         final senderId =
             map['userId']?.toString() ??
@@ -3110,9 +3120,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         // to auto-join the call. Join only when we actually asked to join
         // AND the comment targets us (explicit target, comment authored
         // with our userId, or the text starts with OUR name).
-        final myName =
-            context.read<AuthProvider>().user?.name ??
-            context.read<SessionManager>().userName;
+        final myName = _resolveUserName(
+          context.read<AuthProvider>().user,
+          fallback: '',
+        );
         final pendingJoin = _myJoinRequestSent || _myCallInviteAccepted;
         if ((type == 'callAccept' ||
                 commentText.toLowerCase().contains('request accepted')) &&
@@ -6548,7 +6559,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     final session = context.read<SessionManager>();
     final effectiveUser = user ?? session.getUser();
     final vip = vipDetails ?? effectiveUser?.vipDetails?.toJson();
-    final effectiveName = name ?? effectiveUser?.name ?? session.userName;
+    final effectiveName =
+        (name?.trim().isNotEmpty == true ? name : null) ??
+        _resolveUserName(effectiveUser);
     final effectiveImage = image ?? effectiveUser?.image ?? session.userImage;
     final effectiveCountry = country ?? effectiveUser?.country ?? '';
     final effectiveIsVip = isVIP ?? effectiveUser?.isVIP ?? false;
@@ -6647,7 +6660,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
 
     // Add locally for immediate feedback
     final localComment = _LiveComment(
-      name: user?.name ?? 'Me',
+      name: _resolveUserName(user, fallback: 'Me'),
       text: text,
       userId: session.userId,
       isMine: true,
@@ -6744,7 +6757,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       setState(
         () => _pushComment(
           _LiveComment(
-            name: user?.name ?? 'Me',
+            name: _resolveUserName(user, fallback: 'Me'),
             text: '',
             userId: session.userId,
             isMine: true,
@@ -6889,6 +6902,18 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   /// True when [id] refers to the locally logged-in user. Checks both the
   /// Mongo `_id` (session.userId) and the public uniqueId — backends are not
   /// consistent about which one they echo in call-join payloads.
+  /// Display-name fallback chain — some accounts (seen on VIP users) have
+  /// `name:""` in their User doc while `username` holds the real handle;
+  /// plain `?? name` then renders a literal "User" in comments.
+  String _resolveUserName(User? user, {String fallback = 'User'}) {
+    return (user?.name?.trim().isNotEmpty == true ? user!.name : null) ??
+        (user?.username?.trim().isNotEmpty == true ? user!.username : null) ??
+        (user?.uniqueId?.toString().trim().isNotEmpty == true
+            ? user!.uniqueId.toString()
+            : null) ??
+        fallback;
+  }
+
   bool _isSelfId(String? id) {
     if (id == null || id.isEmpty) return false;
     final session = context.read<SessionManager>();
@@ -7523,7 +7548,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   void _sendJoinRequest() {
     final session = context.read<SessionManager>();
     final user = context.read<AuthProvider>().user;
-    final name = user?.name ?? session.userName;
+    final name = _resolveUserName(user);
     final image = user?.image ?? session.userImage;
     _myJoinRequestSent = true;
     final frameUrl =
@@ -8183,7 +8208,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       'userId': session.userId,
       'liveStreamingId': widget.liveUser.liveRoomId,
       'image': user?.image ?? session.userImage,
-      'name': user?.name ?? session.userName,
+      'name': _resolveUserName(user),
       'country': user?.country ?? '',
       'agoraUid': _myAgoraUid,
       'liveUserMongoId': widget.liveUser.id,
@@ -8753,13 +8778,13 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     final user = context.read<AuthProvider>().user;
     // Only show the heart animation â€” NO comment in chat
     _cheerKey.currentState?.addCheer(
-      name: user?.name ?? 'Me',
+      name: _resolveUserName(user, fallback: 'Me'),
       imageUrl: user?.image,
     );
     SocketService.instance.emit('cheer', {
       'liveStreamingId': widget.liveUser.liveRoomId,
       'userId': session.userId,
-      'name': user?.name ?? session.getUser()?.name ?? '',
+      'name': _resolveUserName(user, fallback: ''),
       'image': user?.image ?? '',
     });
   }
@@ -9621,7 +9646,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       setState(
         () => _pushComment(
           _LiveComment(
-            name: user?.name ?? session.userName,
+            name: _resolveUserName(user),
             text: '',
             userId: session.userId,
             isGift: true,
@@ -9765,7 +9790,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
           'position': -1,
           'user': {
             'id': session.userId,
-            'name': user?.name ?? '',
+            'name': _resolveUserName(user, fallback: ''),
             'image': VideoUtil.getFullImageUrl(user?.image),
             'avatarFrame':
                 user?.avatarFrameImage ?? user?.vipDetails?.profileFrameUrl,
@@ -12022,7 +12047,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         'user': {
           'id': user?.id,
           'userId': session.userId,
-          'name': user?.name ?? session.userName,
+          'name': _resolveUserName(user),
           'image': user?.image ?? session.userImage,
           'isVIP': user?.isVIP ?? false,
           'isVip': user?.isVIP ?? false,
@@ -12159,7 +12184,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
               _upsertPkGifter(
                 _pkIsHost1 ? _pkGiftersHost1 : _pkGiftersHost2,
                 session.userId,
-                user?.name ?? session.userName,
+                _resolveUserName(user),
                 VideoUtil.getFullImageUrl(user?.image ?? session.userImage),
                 totalCoins,
               );
@@ -12167,7 +12192,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
               setState(
                 () => _pushComment(
                   _LiveComment(
-                    name: user?.name ?? session.userName,
+                    name: _resolveUserName(user),
                     text: '',
                     userId: session.userId,
                     isGift: true,
@@ -12207,7 +12232,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                 svgaImage: svgaImage,
                 giftType: giftType,
                 coin: totalCoins ~/ count,
-                senderName: user?.name ?? session.userName,
+                senderName: _resolveUserName(user),
                 senderId: session.userId,
                 senderImage: VideoUtil.getFullImageUrl(
                   user?.image ?? session.userImage,
@@ -12236,7 +12261,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
               // Record local sender to top contributor leaderboard.
               _topContributorController.recordGift(
                 userId: session.userId,
-                name: user?.name ?? session.userName,
+                name: _resolveUserName(user),
                 avatar: VideoUtil.getFullImageUrl(
                   user?.image ?? session.userImage,
                 ),
@@ -15870,7 +15895,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
           'liveStreamingId': widget.liveUser.liveRoomId ?? '',
           'emojiId': emoji.id,
           'senderId': session.userId,
-          'senderName': session.getUser()?.name ?? '',
+          'senderName': _resolveUserName(session.getUser(), fallback: ''),
           'senderAvatar': session.getUser()?.image ?? '',
         });
       },

@@ -3034,10 +3034,10 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'userId': session.userId,
         'isVIP': user?.isVIP ?? false,
         'image': user?.image ?? '',
-        'name': user?.name ?? '',
+        'name': _resolveUserName(user, fallback: ''),
         'gender': user?.gender ?? '',
         'country': country,
-        'userName': user?.name ?? '',
+        'userName': _resolveUserName(user, fallback: ''),
         'avatarFrame': frameUrl,
         'isHost': _amHost,
         'isAdmin': _iAmAdmin,
@@ -3055,7 +3055,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'user': {
           'userId': session.userId,
           '_id': user?.id ?? session.userId,
-          'name': user?.name ?? '',
+          'name': _resolveUserName(user, fallback: ''),
           'image': user?.image ?? '',
           'country': country,
           'isVIP': user?.isVIP ?? false,
@@ -3092,7 +3092,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'user': {
           'id': user?.id,
           'userId': session.userId,
-          'name': user?.name,
+          'name': _resolveUserName(user, fallback: ''),
           'image': user?.image,
           'isVIP': user?.isVIP ?? false,
           'isVip': user?.isVIP ?? false,
@@ -4663,7 +4663,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         final myId = context.read<SessionManager>().userId;
         final isMe =
             (map['userId']?.toString() == myId) ||
-            name == (context.read<AuthProvider>().user?.name ?? '');
+            name ==
+                _resolveUserName(
+                  context.read<AuthProvider>().user,
+                  fallback: '',
+                );
         if (isMe && coins > 0) {
           // Client-generated draws already credited the win in the gift
           // sheet — skip the credit on the echoed event (combo still shows).
@@ -6061,11 +6065,26 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       final commentText = map['comment']?.toString() ?? '';
       final type = map['type']?.toString() ?? 'comment';
       if (type == 'luckyBag' || type == 'luckyWin') return;
-      final userName =
-          map['name']?.toString() ??
-          map['user']?['name']?.toString() ??
-          map['user']?['userName']?.toString() ??
-          'User';
+      // Some accounts have `name:""` in their User doc — the display name
+      // lives in `username`. Treat empty/'User' placeholder as missing and
+      // walk every field clients/backends may carry it in.
+      String pickName(dynamic v) =>
+          (v?.toString().trim().isNotEmpty == true &&
+                  v.toString().trim().toLowerCase() != 'user')
+              ? v.toString().trim()
+              : '';
+      final nestedUser = map['user'] is Map ? map['user'] as Map : const {};
+      final resolvedName = [
+        pickName(map['name']),
+        pickName(nestedUser['name']),
+        pickName(nestedUser['username']),
+        pickName(nestedUser['userName']),
+        pickName(map['username']),
+        pickName(map['userName']),
+        pickName(map['senderName']),
+        pickName(map['senderUserName']),
+      ].firstWhere((v) => v.isNotEmpty, orElse: () => '');
+      final userName = resolvedName.isNotEmpty ? resolvedName : 'User';
       final userImage =
           map['image']?.toString() ??
           map['user']?['image']?.toString() ??
@@ -7504,7 +7523,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     setState(
       () => _pushComment(
         _LiveComment(
-          name: user?.name ?? 'Me',
+          name: _resolveUserName(user, fallback: 'Me'),
           text: text,
           isMine: true,
           userImage: user?.image,
@@ -7554,7 +7573,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'liveUserId': _hostUserId ?? _roomUser.id ?? '',
       'liveUserMongoId': _roomUser.id ?? '',
       'userId': session.userId,
-      'name': user?.name ?? session.userName,
+      'name': _resolveUserName(user),
       'image': user?.image ?? session.userImage,
       'country': user?.country ?? session.getCountry(),
       'isVIP': user?.isVIP ?? false,
@@ -7566,7 +7585,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'user': {
         'id': user?.id,
         'userId': session.userId,
-        'name': user?.name ?? session.userName,
+        'name': _resolveUserName(user),
         'image': user?.image ?? session.userImage,
         'isVIP': user?.isVIP ?? false,
         'isVip': user?.isVIP ?? false,
@@ -10945,7 +10964,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     final hostId = _hostUserId ?? liveUserMongoId;
     if (liveId.isEmpty) return;
     _cheerKey.currentState?.addCheer(
-      name: user?.name ?? 'Me',
+      name: _resolveUserName(user, fallback: 'Me'),
       imageUrl: user?.image,
     );
     SocketService.instance.emit(Const.eventCommentAudio, {
@@ -10955,12 +10974,12 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'userId': session.userId,
       'liveUserId': hostId,
       'type': 'comment',
-      'name': user?.name,
+      'name': _resolveUserName(user),
       'image': user?.image,
       'user': {
         'id': user?.id,
         'userId': session.userId,
-        'name': user?.name,
+        'name': _resolveUserName(user, fallback: ''),
         'image': user?.image,
         'isVIP': user?.isVIP ?? false,
         'isVip': user?.isVIP ?? false,
@@ -12529,7 +12548,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     if (!mounted) return;
     final session = context.read<SessionManager>();
     final user = context.read<AuthProvider>().user;
-    final senderName = user?.name ?? session.userName;
+    final senderName = _resolveUserName(user);
     final senderImage = VideoUtil.getFullImageUrl(
       user?.image ?? session.userImage,
     );
@@ -12864,7 +12883,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           'user': {
             'userId': session.userId,
             'id': session.userId,
-            'name': user?.name ?? '',
+            'name': _resolveUserName(user, fallback: ''),
             'image': VideoUtil.getFullImageUrl(user?.image),
             'avatarFrame':
                 user?.avatarFrameImage ?? user?.vipDetails?.profileFrameUrl,
@@ -15886,7 +15905,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       setState(
         () => _pushComment(
           _LiveComment(
-            name: user?.name ?? 'Me',
+            name: _resolveUserName(user, fallback: 'Me'),
             text: '',
             isMine: true,
             userImage: user?.image,
@@ -15909,12 +15928,12 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'liveUserId': hostId,
         'messageType': 'image',
         'type': 'image',
-        'name': user?.name,
+        'name': _resolveUserName(user),
         'image': user?.image,
         'user': {
           'id': user?.id,
           'userId': session.userId,
-          'name': user?.name,
+          'name': _resolveUserName(user, fallback: ''),
           'image': user?.image,
           'isVIP': user?.isVIP ?? false,
           'isVip': user?.isVIP ?? false,
