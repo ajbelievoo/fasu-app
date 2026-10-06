@@ -81,6 +81,12 @@ jobs:
           flutter doctor -v
           pod --version
 
+      # SPM (enabled by default in Flutter 3.47) makes podhelper skip plugins
+      # that ship Package.swift — but google_mobile_ads' podspec still declares
+      # a pod dependency on webview_flutter_wkwebview -> "unable to find spec".
+      - name: Disable SwiftPM for CocoaPods resolution
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Pub get
         run: flutter pub get
 
