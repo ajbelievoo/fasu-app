@@ -90,27 +90,10 @@ jobs:
           set -o pipefail
           if ! pod install --repo-update 2>&1 | tee ../pod_install.log; then
             tr -cd '\11\12\15\40-\176' < ../pod_install.log > pod_install_clean.log
-            echo "FAIL_POD_INSTALL=1" >> "$GITHUB_ENV"
+            grep -anE '^\[!' pod_install_clean.log | head -5 \
+              | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
-
-      - name: Upload pod-install log on failure
-        if: ${{ env.FAIL_POD_INSTALL == '1' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ios-build-logs
-          name: iOS build failure logs
-          files: pod_install_clean.log
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fail after pod install error
-        if: ${{ env.FAIL_POD_INSTALL == '1' }}
-        run: |
-          grep -anE '^\[!' pod_install_clean.log | head -5 \
-            | while IFS= read -r l; do echo "::error::$l"; done
-          exit 1
 
       - name: Build unsigned iOS app
         env:
@@ -126,28 +109,10 @@ jobs:
           [ -z "$UNILIVE_API_KEY" ] && echo "::warning::UNILIVE_API_KEY secret not set — build will compile but API calls will fail"
           if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_build.log; then
             tr -cd '\11\12\15\40-\176' < ios_build.log > ios_build_clean.log
-            echo "FAIL_BUILD=1" >> "$GITHUB_ENV"
+            grep -anE 'error:|requires a higher' ios_build_clean.log | head -5 \
+              | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
-
-      - name: Upload build log on failure
-        if: ${{ env.FAIL_BUILD == '1' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ios-build-logs
-          name: iOS build failure logs
-          files: ios_build_clean.log
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fail after build error
-        if: ${{ env.FAIL_BUILD == '1' }}
-        run: |
-          tr -cd '\11\12\15\40-\176' < ios_build.log | \
-            grep -anE 'error:|requires a higher' | head -5 \
-            | while IFS= read -r l; do echo "::error::$l"; done
-          exit 1
 
       - name: Package .ipa
         run: |
@@ -177,28 +142,10 @@ jobs:
           [ -n "$UNILIVE_FACEBOOK_APP_ID" ] && ARGS+=(--dart-define=FACEBOOK_APP_ID=$UNILIVE_FACEBOOK_APP_ID)
           if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_sim_build.log; then
             tr -cd '\11\12\15\40-\176' < ios_sim_build.log > ios_sim_build_clean.log
-            echo "FAIL_SIM=1" >> "$GITHUB_ENV"
+            grep -anE 'error:|requires a higher' ios_sim_build_clean.log | head -5 \
+              | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
-
-      - name: Upload sim log on failure
-        if: ${{ env.FAIL_SIM == '1' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ios-build-logs
-          name: iOS build failure logs
-          files: ios_sim_build_clean.log
-          prerelease: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Fail after sim build error
-        if: ${{ env.FAIL_SIM == '1' }}
-        run: |
-          tr -cd '\11\12\15\40-\176' < ios_sim_build.log | \
-            grep -anE 'error:|requires a higher' | head -5 \
-            | while IFS= read -r l; do echo "::error::$l"; done
-          exit 1
 
       - name: Package simulator .app
         run: |
@@ -228,3 +175,15 @@ jobs:
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload failure logs
+        if: failure()
+        run: |
+          for f in pod_install_clean.log ios_build_clean.log ios_sim_build_clean.log; do
+            [ -f "$f" ] || continue
+            gh release create ios-build-logs --prerelease \
+              --title "iOS build failure logs" --notes "sanitized logs" 2>/dev/null || true
+            gh release upload ios-build-logs "$f" --clobber
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
