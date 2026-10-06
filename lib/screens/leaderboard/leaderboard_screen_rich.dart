@@ -112,8 +112,6 @@ class _LeaderboardScreenRichState extends State<LeaderboardScreenRich> {
         alignment: Alignment.topLeft,
         children: [
           const Positioned.fill(child: _PalaceBackground()),
-          // In light mode the palace artwork is replaced by the soft light
-          // gradient inside _PalaceBackground itself.
           Positioned.fill(
             child: SafeArea(
               child: Column(
@@ -939,23 +937,6 @@ class _PalaceBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!AppTheme.isDark(context)) {
-      // Light mode: soft gradient instead of the dark palace artwork.
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: AppTheme.bgGradient(
-              context,
-              const [Color(0xFF0B0B10), Color(0xFF0B0B10)],
-            ),
-          ),
-        ),
-      );
-    }
     return Image.asset(
       'assets/images/leaderboard.webp',
       fit: BoxFit.cover,

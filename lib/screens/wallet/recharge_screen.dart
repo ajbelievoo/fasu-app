@@ -243,7 +243,6 @@ class _RechargeScreenState extends State<RechargeScreen> {
       itemBuilder:
           (ctx) => const [
             PopupMenuItem(value: 'USD', child: Text('USD (\$)')),
-            PopupMenuItem(value: 'INR', child: Text('INR (₹)')),
           ],
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
