@@ -32,6 +32,12 @@ class Setting {
     this.maintenanceMode = false,
     this.maintenanceMessage,
     this.isAppActive = true,
+    this.latestVersionCode = 0,
+    this.minVersionCode = 0,
+    this.forceUpdate = false,
+    this.updateUrl,
+    this.updateMessage,
+    this.apkFileLink,
     this.termsCondition,
     this.privacyPolicy,
     this.aboutUs,
@@ -86,6 +92,12 @@ class Setting {
   final bool maintenanceMode;
   final String? maintenanceMessage;
   final bool isAppActive;
+  final int latestVersionCode;
+  final int minVersionCode;
+  final bool forceUpdate;
+  final String? updateUrl;
+  final String? updateMessage;
+  final String? apkFileLink;
   final String? termsCondition;
   final String? privacyPolicy;
   final String? aboutUs;
@@ -170,6 +182,12 @@ class Setting {
       maintenanceMode: parseBool(json['maintenanceMode']),
       maintenanceMessage: parseString(json['maintenanceMessage']),
       isAppActive: parseBool(json['isAppActive'], true),
+      latestVersionCode: parseInt(json['version'] ?? json['latestVersionCode']),
+      minVersionCode: parseInt(json['minVersionCode']),
+      forceUpdate: parseBool(json['forceUpdate']),
+      updateUrl: parseString(json['updateUrl']),
+      updateMessage: parseString(json['updateMessage']),
+      apkFileLink: parseString(json['apkFileLink']),
       termsCondition: parseString(json['termsCondition']),
       privacyPolicy: parseString(json['privacyPolicy']),
       aboutUs: parseString(json['aboutUs']),
@@ -289,6 +307,12 @@ class Setting {
     'maintenanceMode': maintenanceMode,
     'maintenanceMessage': maintenanceMessage,
     'isAppActive': isAppActive,
+    'version': latestVersionCode,
+    'minVersionCode': minVersionCode,
+    'forceUpdate': forceUpdate,
+    'updateUrl': updateUrl,
+    'updateMessage': updateMessage,
+    'apkFileLink': apkFileLink,
     'termsCondition': termsCondition,
     'privacyPolicy': privacyPolicy,
     'aboutUs': aboutUs,

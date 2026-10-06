@@ -18,6 +18,7 @@ import '../../utils/audio_room_navigation.dart';
 import '../../utils/log.dart';
 import '../../widgets/daily_checkin_dialog.dart';
 import '../../widgets/notification_prompt_dialog.dart';
+import '../../widgets/update_prompt.dart';
 import '../../widgets/settings_extras.dart';
 import '../../widgets/user_avatar.dart';
 import '../chat/message_hub_screen.dart';
@@ -72,6 +73,10 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<void> _showLaunchPopups() async {
+    if (!mounted) return;
+    // Play/forced update check runs first — an outdated build shouldn't
+    // reach the feature popups at all when a min-version block is set.
+    await UpdatePrompt.maybeShow(context);
     if (!mounted) return;
     // Forced one-time password setup for accounts that have none — blocks
     // the app until a password is saved (social-login signups + old users).
