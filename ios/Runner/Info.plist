@@ -88,5 +88,6 @@
 			<string>cstr6suwn9.skadnetwork</string>
 		</dict>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>	<string>UniLive needs microphone access for live audio rooms and calls.</string>
 </dict>
 </plist>

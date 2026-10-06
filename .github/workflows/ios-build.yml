@@ -1,0 +1,179 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode + iOS SDK
+        run: |
+          ls -d /Applications/Xcode*.app
+          PICKED=""
+          for v in 26.1 26.0 16.4 16.3 16.2 16.1 16.0; do
+            if [ -d "/Applications/Xcode_$v.app" ]; then
+              PICKED="/Applications/Xcode_$v.app"; break
+            fi
+          done
+          [ -z "$PICKED" ] && PICKED="/Applications/Xcode.app"
+          echo "::notice::Using $PICKED"
+          sudo xcode-select -s "$PICKED/Contents/Developer"
+          xcodebuild -version | while IFS= read -r l; do echo "::notice::$l"; done
+          sudo xcodebuild -runFirstLaunch || true
+          SDKS=$(xcodebuild -showsdks 2>/dev/null | grep -c iphoneos || true)
+          echo "::notice::iphoneos sdk count: $SDKS"
+          if [ "$SDKS" -eq 0 ]; then
+            echo "::notice::iOS SDK missing — downloading platform"
+            sudo xcodebuild -downloadPlatform iOS || xcodebuild -downloadPlatform iOS || true
+          fi
+
+      - name: Set up Flutter 3.47.5
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+          cache: true
+
+      # lib/constants/api_key.dart is gitignored — CI must generate it.
+      # Secrets:
+      #   UNILIVE_API_KEY       — real backend API key (required for a
+      #                           working build; a placeholder compiles but
+      #                           every API call fails)
+      #   UNILIVE_POSITIONSTACK_KEY / UNILIVE_FACEBOOK_APP_ID — optional
+      - name: Generate api_key.dart
+        run: |
+          cat > lib/constants/api_key.dart <<'DART'
+          /// CI-generated fallback. The real value is injected at build time
+          /// via --dart-define=API_KEY (from the UNILIVE_API_KEY secret).
+          const String kApiKey = 'MISSING_API_KEY';
+
+          const String positionStackKey = String.fromEnvironment(
+            'POSITIONSTACK_KEY',
+            defaultValue: '',
+          );
+          DART
+
+      - name: Ensure GoogleService-Info.plist (optional)
+        env:
+          UNILIVE_GOOGLE_SERVICE_INFO: ${{ secrets.UNILIVE_GOOGLE_SERVICE_INFO }}
+        run: |
+          if [ -n "$UNILIVE_GOOGLE_SERVICE_INFO" ]; then
+            echo "$UNILIVE_GOOGLE_SERVICE_INFO" | base64 -d > ios/Runner/GoogleService-Info.plist
+            plutil -lint ios/Runner/GoogleService-Info.plist
+            echo "::notice::Using real GoogleService-Info.plist from secret"
+          else
+            echo "::notice::No UNILIVE_GOOGLE_SERVICE_INFO secret — Firebase init will fail gracefully in-app"
+          fi
+
+      - name: Flutter doctor
+        run: |
+          flutter --version
+          flutter doctor -v
+          pod --version
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: CocoaPods install
+        working-directory: ios
+        run: |
+          set -o pipefail
+          if ! pod install --repo-update 2>&1 | tee ../pod_install.log; then
+            grep -nE '^\[!|error|Error|fatal' ../pod_install.log | tail -20 \
+              | while IFS= read -r l; do echo "::error::$l"; done
+            tail -n 40 ../pod_install.log >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Build unsigned iOS app
+        env:
+          UNILIVE_API_KEY: ${{ secrets.UNILIVE_API_KEY }}
+          UNILIVE_POSITIONSTACK_KEY: ${{ secrets.UNILIVE_POSITIONSTACK_KEY }}
+          UNILIVE_FACEBOOK_APP_ID: ${{ secrets.UNILIVE_FACEBOOK_APP_ID }}
+        run: |
+          set -o pipefail
+          ARGS=(--release --no-codesign)
+          [ -n "$UNILIVE_API_KEY" ] && ARGS+=(--dart-define=API_KEY=$UNILIVE_API_KEY)
+          [ -n "$UNILIVE_POSITIONSTACK_KEY" ] && ARGS+=(--dart-define=POSITIONSTACK_KEY=$UNILIVE_POSITIONSTACK_KEY)
+          [ -n "$UNILIVE_FACEBOOK_APP_ID" ] && ARGS+=(--dart-define=FACEBOOK_APP_ID=$UNILIVE_FACEBOOK_APP_ID)
+          [ -z "$UNILIVE_API_KEY" ] && echo "::warning::UNILIVE_API_KEY secret not set — build will compile but API calls will fail"
+          if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_build.log; then
+            grep -nE 'error:|Error|fatal|FAILED|requires a higher' ios_build.log | tail -20 \
+              | while IFS= read -r l; do echo "::error::$l"; done
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 60 ios_build.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Package .ipa
+        run: |
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -qry ../unilive.ipa Payload
+          ls -lh ../unilive.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unilive-device-ipa-not-for-appetize
+          path: build/ios/unilive.ipa
+          retention-days: 30
+
+      - name: Build iOS simulator app
+        env:
+          UNILIVE_API_KEY: ${{ secrets.UNILIVE_API_KEY }}
+          UNILIVE_POSITIONSTACK_KEY: ${{ secrets.UNILIVE_POSITIONSTACK_KEY }}
+          UNILIVE_FACEBOOK_APP_ID: ${{ secrets.UNILIVE_FACEBOOK_APP_ID }}
+        run: |
+          set -o pipefail
+          ARGS=(--simulator --no-codesign)
+          [ -n "$UNILIVE_API_KEY" ] && ARGS+=(--dart-define=API_KEY=$UNILIVE_API_KEY)
+          [ -n "$UNILIVE_POSITIONSTACK_KEY" ] && ARGS+=(--dart-define=POSITIONSTACK_KEY=$UNILIVE_POSITIONSTACK_KEY)
+          [ -n "$UNILIVE_FACEBOOK_APP_ID" ] && ARGS+=(--dart-define=FACEBOOK_APP_ID=$UNILIVE_FACEBOOK_APP_ID)
+          if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_sim_build.log; then
+            grep -nE 'error:|Error|fatal|FAILED' ios_sim_build.log | tail -20 \
+              | while IFS= read -r l; do echo "::error::$l"; done
+            tail -n 60 ios_sim_build.log >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Package simulator .app
+        run: |
+          cd build/ios/iphonesimulator
+          xcrun vtool -show-build Runner.app/Runner \
+            | grep -i 'platform\|minos' | while IFS= read -r l; do echo "::notice::vtool:$l"; done
+          mkdir -p ../appetize
+          cp -R Runner.app ../appetize/
+          cd ../appetize && zip -qry ../unilive-simulator.zip Runner.app
+
+      - name: Upload appetize-ready artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: unilive-appetize-zip
+          path: build/ios/appetize
+          retention-days: 30
+
+      - name: Publish simulator zip release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-simulator-latest
+          name: iOS Simulator Build
+          body: |
+            unilive-simulator.zip — iOS simulator build (debug).
+            Upload this .zip file directly to https://appetize.io. Do NOT unzip it first.
+          files: build/ios/unilive-simulator.zip
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
