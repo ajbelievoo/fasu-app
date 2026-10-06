@@ -11834,6 +11834,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'time': _watchSeconds,
         'reason': 'Host switched to video live',
       };
+      _ludoCtrl.notifyRoomEnd();
       SocketService.instance.emit(Const.eventLiveHostEnd, endPayload);
       SocketService.instance.emit(Const.liveEndByEnd, endPayload);
       SocketService.instance.emit(Const.eventEndLive, endPayload);
@@ -12021,6 +12022,9 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'time': _watchSeconds,
         'reason': 'Audio room ended by host',
       };
+      // The room itself is gone — close the Ludo table for everyone before
+      // the webview/socket gets torn down.
+      _ludoCtrl.notifyRoomEnd();
       SocketService.instance.emit(Const.eventLiveHostEnd, endPayload);
       SocketService.instance.emit(Const.liveEndByEnd, endPayload);
       SocketService.instance.emit(Const.eventEndLive, endPayload);
@@ -12231,6 +12235,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
               TextButton(
                 onPressed: () {
                   Navigator.pop(ctx);
+                  _ludoCtrl.notifyRoomEnd();
                   SocketService.instance.emit(Const.eventLiveEndByAdmin, {
                     'liveStreamingId': _liveId,
                     'liveUserMongoId': widget.roomUser.id ?? '',

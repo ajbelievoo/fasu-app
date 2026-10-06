@@ -34,6 +34,10 @@ class LudoRoomPanelController {
   void notifyResumed() => _state?.notifyResumed();
   void notifyAway() => _state?.notifyAway();
 
+  /// The audio room is being torn down for everyone — tell the game server
+  /// to close the table (only honoured from a host/admin session).
+  void notifyRoomEnd() => _state?.notifyRoomEnd();
+
   /// Push the room's muted-seat user ids so board avatars show a mic badge.
   void setMicMuted(List<String> userIds) =>
       _state?.setMicMuted(userIds);
@@ -104,6 +108,12 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
   /// clock (same as a dropped socket).
   void notifyAway() {
     _controller.runJavaScript('window.ludoAway && window.ludoAway()');
+  }
+
+  /// The room itself ended (host ended live / admin close) — the game
+  /// server closes the table for every participant.
+  void notifyRoomEnd() {
+    _controller.runJavaScript('window.ludoRoomEnd && window.ludoRoomEnd()');
   }
 
   /// Forward the room's muted-seat user ids into the game page.
