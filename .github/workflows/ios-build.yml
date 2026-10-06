@@ -89,7 +89,8 @@ jobs:
         run: |
           set -o pipefail
           if ! pod install --repo-update 2>&1 | tee ../pod_install.log; then
-            tr -cd '\11\12\15\40-\176' < ../pod_install.log > pod_install_clean.log
+            tr -cd '\11\12\15\40-\176' < ../pod_install.log > ../pod_install_clean.log
+            cp ../pod_install_clean.log pod_install_clean.log
             grep -anE '^\[!' pod_install_clean.log | head -5 \
               | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
