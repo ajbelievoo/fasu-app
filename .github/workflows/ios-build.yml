@@ -114,7 +114,7 @@ jobs:
           [ -n "$UNILIVE_POSITIONSTACK_KEY" ] && ARGS+=(--dart-define=POSITIONSTACK_KEY=$UNILIVE_POSITIONSTACK_KEY)
           [ -n "$UNILIVE_FACEBOOK_APP_ID" ] && ARGS+=(--dart-define=FACEBOOK_APP_ID=$UNILIVE_FACEBOOK_APP_ID)
           [ -z "$UNILIVE_API_KEY" ] && echo "::warning::UNILIVE_API_KEY secret not set — build will compile but API calls will fail"
-          if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_build.log; then
+          if ! flutter build ios -v "${ARGS[@]}" 2>&1 | tee ios_build.log; then
             tr -cd '\11\12\15\40-\176' < ios_build.log > ios_build_clean.log
             grep -anE 'error:|requires a higher' ios_build_clean.log | head -5 \
               | while IFS= read -r l; do echo "::error::$l"; done
