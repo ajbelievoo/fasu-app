@@ -20,7 +20,10 @@ jobs:
         run: |
           ls -d /Applications/Xcode*.app
           PICKED=""
-          for v in 26.1 26.0 16.4 16.3 16.2 16.1 16.0; do
+          # Xcode.app = default FULL Xcode on the runner (carries the iOS
+          # device platform). Stripped versioned variants like Xcode_26.1.app
+          # may be missing it -> 'no destination matching generic/platform=iOS'.
+          for v in 16.4 16.3 16.2 16.1 16.0; do
             if [ -d "/Applications/Xcode_$v.app" ]; then
               PICKED="/Applications/Xcode_$v.app"; break
             fi
@@ -30,12 +33,16 @@ jobs:
           sudo xcode-select -s "$PICKED/Contents/Developer"
           xcodebuild -version | while IFS= read -r l; do echo "::notice::$l"; done
           sudo xcodebuild -runFirstLaunch || true
-          SDKS=$(xcodebuild -showsdks 2>/dev/null | grep -c iphoneos || true)
-          echo "::notice::iphoneos sdk count: $SDKS"
+          # NOTE: 'iphoneos' substring also matches 'iphonesimulator' — must
+          # anchor on '-sdk iphoneos' so sim-only installs still trigger the
+          # device platform download.
+          SDKS=$(xcodebuild -showsdks 2>/dev/null | grep -cE -- '-sdk iphoneos' || true)
+          echo "::notice::device iphoneos sdk count: $SDKS"
           if [ "$SDKS" -eq 0 ]; then
-            echo "::notice::iOS SDK missing — downloading platform"
+            echo "::notice::iOS device platform missing — downloading"
             sudo xcodebuild -downloadPlatform iOS || xcodebuild -downloadPlatform iOS || true
           fi
+          xcodebuild -showsdks 2>/dev/null | grep -i 'sdk' | while IFS= read -r l; do echo "::notice::sdk:$l"; done
 
       - name: Set up Flutter 3.47.5
         uses: subosito/flutter-action@v2
