@@ -704,6 +704,19 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   final LudoRoomPanelController _ludoCtrl = LudoRoomPanelController();
   bool _isTranslationEnabled = false;
 
+  /// Push muted-seat user ids into the Ludo web page so board avatars can
+  /// show a mic-off badge for players whose room mic is off.
+  void _syncLudoMic() {
+    if (!_ludoPanelVisible) return;
+    try {
+      final ids = _seats
+          .where((s) => s.isMuted && (s.userId ?? '').isNotEmpty)
+          .map((s) => s.userId!)
+          .toList();
+      _ludoCtrl.setMicMuted(ids);
+    } catch (_) {}
+  }
+
   // ---- CP/Friend pair seat positions for BondLink ----
   Offset? _bondStartPos;
   Offset? _bondEndPos;
@@ -1221,6 +1234,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     _micMode = _roomUser.micMode;
     _musicPermission = _roomUser.musicPermission;
     _seats = List<SeatItem>.from(_roomUser.seat);
+    _syncLudoMic();
     Log.d(_tag, 'SEAT_AUDIT initState seats from roomUser:');
     for (final s in _seats) {
       Log.d(_tag, '  ${s.toDebugString()}');
@@ -2211,6 +2225,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
               _wheatMode = updated.wheatMode;
               _seats = List<SeatItem>.from(updated.seat);
               _ensureHostInSeats();
+              _syncLudoMic();
               _syncSeatCount(_roomUser.seatCount);
               _viewerCount = updated.view;
               _initViewerList();
@@ -3324,6 +3339,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         }
         _musicPermission = updated.musicPermission;
         _seats = List<SeatItem>.from(updated.seat);
+        _syncLudoMic();
         _ensureHostInSeats();
         _syncSeatCount(targetCount);
         _viewerCount = updated.view;
@@ -3890,6 +3906,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                   : _seats.indexWhere((e) => e.position == pos);
           if (idx >= 0) {
             setState(() => _seats[idx].mute = mute);
+            _syncLudoMic();
             // Sync local Agora audio if this is my seat.
             final myId = context.read<SessionManager>().userId;
             if (_seats[idx].userId == myId) {

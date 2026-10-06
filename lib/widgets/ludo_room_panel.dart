@@ -33,6 +33,10 @@ class LudoRoomPanelController {
   LudoRoomPanelState? _state;
   void notifyResumed() => _state?.notifyResumed();
   void notifyAway() => _state?.notifyAway();
+
+  /// Push the room's muted-seat user ids so board avatars show a mic badge.
+  void setMicMuted(List<String> userIds) =>
+      _state?.setMicMuted(userIds);
 }
 
 class LudoRoomPanel extends StatefulWidget {
@@ -100,6 +104,12 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
   /// clock (same as a dropped socket).
   void notifyAway() {
     _controller.runJavaScript('window.ludoAway && window.ludoAway()');
+  }
+
+  /// Forward the room's muted-seat user ids into the game page.
+  void setMicMuted(List<String> userIds) {
+    final list = userIds.map((id) => '"$id"').join(',');
+    _controller.runJavaScript('window.ludoMic && window.ludoMic([$list])');
   }
 
   void _onGameMessage(String message) {
