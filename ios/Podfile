@@ -9,15 +9,16 @@ project 'Runner', {
 }
 
 def flutter_root
-  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'ephemeral', 'Flutter-Generated.xcconfig'), __FILE__)
-  unless File.exist?(generated_xcode_build_settings_path)
-    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  # This project predates the ephemeral/ layout — check both locations.
+  ['ephemeral/Flutter-Generated.xcconfig', 'Generated.xcconfig'].each do |rel|
+    path = File.expand_path(File.join('..', 'Flutter', *rel.split('/')), __FILE__)
+    next unless File.exist?(path)
+    File.foreach(path) do |line|
+      matches = line.match(/FLUTTER_ROOT\=(.*)/)
+      return matches[1].strip if matches
+    end
   end
-  File.foreach(generated_xcode_build_settings_path) do |line|
-    matches = line.match(/FLUTTER_ROOT\=(.*)/)
-    return matches[1].strip if matches
-  end
-  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Flutter-Generated.xcconfig, then run flutter pub get"
+  raise "FLUTTER_ROOT not found in ios/Flutter/{ephemeral/Flutter-Generated,Generated}.xcconfig — run flutter pub get first"
 end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)

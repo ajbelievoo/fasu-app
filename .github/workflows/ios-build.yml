@@ -2,7 +2,7 @@ name: iOS Build
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -89,9 +89,12 @@ jobs:
         run: |
           set -o pipefail
           if ! pod install --repo-update 2>&1 | tee ../pod_install.log; then
-            grep -nE '^\[!|error|Error|fatal' ../pod_install.log | tail -20 \
+            tr -cd '\11\12\15\40-\176' < ../pod_install.log | \
+              grep -anE '^\[!|error|Error|fatal' | tail -15 \
               | while IFS= read -r l; do echo "::error::$l"; done
-            tail -n 40 ../pod_install.log >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::--- log tail ---"
+            tr -cd '\11\12\15\40-\176' < ../pod_install.log | tail -n 30 \
+              | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
 
@@ -108,11 +111,12 @@ jobs:
           [ -n "$UNILIVE_FACEBOOK_APP_ID" ] && ARGS+=(--dart-define=FACEBOOK_APP_ID=$UNILIVE_FACEBOOK_APP_ID)
           [ -z "$UNILIVE_API_KEY" ] && echo "::warning::UNILIVE_API_KEY secret not set — build will compile but API calls will fail"
           if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_build.log; then
-            grep -nE 'error:|Error|fatal|FAILED|requires a higher' ios_build.log | tail -20 \
+            tr -cd '\11\12\15\40-\176' < ios_build.log | \
+              grep -anE 'error:|Error|fatal|FAILED|requires a higher' | tail -15 \
               | while IFS= read -r l; do echo "::error::$l"; done
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            tail -n 60 ios_build.log >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::--- log tail ---"
+            tr -cd '\11\12\15\40-\176' < ios_build.log | tail -n 30 \
+              | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
 
@@ -143,9 +147,12 @@ jobs:
           [ -n "$UNILIVE_POSITIONSTACK_KEY" ] && ARGS+=(--dart-define=POSITIONSTACK_KEY=$UNILIVE_POSITIONSTACK_KEY)
           [ -n "$UNILIVE_FACEBOOK_APP_ID" ] && ARGS+=(--dart-define=FACEBOOK_APP_ID=$UNILIVE_FACEBOOK_APP_ID)
           if ! flutter build ios "${ARGS[@]}" 2>&1 | tee ios_sim_build.log; then
-            grep -nE 'error:|Error|fatal|FAILED' ios_sim_build.log | tail -20 \
+            tr -cd '\11\12\15\40-\176' < ios_sim_build.log | \
+              grep -anE 'error:|Error|fatal|FAILED' | tail -15 \
               | while IFS= read -r l; do echo "::error::$l"; done
-            tail -n 60 ios_sim_build.log >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::--- log tail ---"
+            tr -cd '\11\12\15\40-\176' < ios_sim_build.log | tail -n 30 \
+              | while IFS= read -r l; do echo "::error::$l"; done
             exit 1
           fi
 
