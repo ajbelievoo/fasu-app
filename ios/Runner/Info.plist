@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Belive</string>
+	<string>UniLive</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>belive</string>
+	<string>unilive</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -24,8 +24,31 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-1326731170162052~9335588055</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+		<string>whatsapp</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Belive needs camera access to capture your live selfie and ID card for KYC verification. This is required to verify your identity and unlock withdrawals.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>UniLive needs microphone access for live audio rooms and calls.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Belive may save your KYC verification photos to your photo library.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Belive needs photo library access to let you upload additional KYC documents like address proof.</string>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -53,12 +76,6 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Belive needs camera access to capture your live selfie and ID card for KYC verification. This is required to verify your identity and unlock withdrawals.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Belive needs photo library access to let you upload additional KYC documents like address proof.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Belive may save your KYC verification photos to your photo library.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -72,22 +89,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>https</string>
-		<string>http</string>
-		<string>whatsapp</string>
-	</array>
-	<!-- AdMob App ID — required by google_mobile_ads. -->
-	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-1326731170162052~9335588055</string>
-	<key>SKAdNetworkItems</key>
-	<array>
-		<dict>
-			<key>SKAdNetworkIdentifier</key>
-			<string>cstr6suwn9.skadnetwork</string>
-		</dict>
-	</array>
-	<key>NSMicrophoneUsageDescription</key>	<string>UniLive needs microphone access for live audio rooms and calls.</string>
 </dict>
 </plist>

@@ -137,8 +137,9 @@ class _SplashScreenState extends State<SplashScreen>
 
     debugPrint('[Splash] Target route: $target');
 
-    // Using a microtask to ensure we are not in the middle of a build
-    Future.microtask(() {
+    // Post-frame: avoids registering dependencies mid-deactivation,
+    // which trips InheritedElement asserts in debug builds.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       try {
         context.go(target);
