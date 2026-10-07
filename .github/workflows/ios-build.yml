@@ -221,6 +221,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Upload to Appetize
+        if: github.event_name != "pull_request"
+        continue-on-error: true
+        uses: appetizeio/github-action-appetize@v1.0.5
+        with:
+          apiToken: ${{ secrets.APPETIZE_API_TOKEN }}
+          appFile: build/ios/unilive-simulator.zip
+          publicKey: jphgt6zw52sk6tqon3tt4epzby
+          platform: ios
+          note: ${{ github.sha }}
+
       - name: Upload failure logs
         if: failure()
         run: |
