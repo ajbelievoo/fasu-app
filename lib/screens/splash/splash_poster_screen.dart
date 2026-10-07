@@ -70,7 +70,7 @@ class _SplashPosterScreenState extends State<SplashPosterScreen> {
 
     // Always route through the splash screen so it can verify the device
     // block status before allowing access to the main app.
-    Future.microtask(() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.go('/${AppRoutes.splash}');
     });
