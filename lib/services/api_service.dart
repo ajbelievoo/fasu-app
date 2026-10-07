@@ -151,6 +151,13 @@ class ApiService {
     return UserRoot.fromJson(_asMap(r.data));
   }
 
+  /// Unified password auth — identifier accepts username / email /
+  /// mobile number / uniqueId. Pass register:true to create the account.
+  static Future<UserRoot> loginPassword(Map<String, dynamic> body) async {
+    final r = await _dio.post('/user/loginPassword', data: body);
+    return UserRoot.fromJson(_asMap(r.data));
+  }
+
   static Future<UserRoot> bindAccount(Map<String, dynamic> body) async {
     final r = await _dio.post('/user/bindAccount', data: body);
     return UserRoot.fromJson(_asMap(r.data));

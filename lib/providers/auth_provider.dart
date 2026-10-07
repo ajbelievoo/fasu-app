@@ -294,6 +294,55 @@ class AuthProvider extends ChangeNotifier {
     return res;
   }
 
+  /// Password login/signup — identifier accepts username, email or
+  /// mobile number. No OTP involved (loginType 4 on the backend).
+  Future<UserRoot> passwordLogin({
+    required String identifier,
+    required String password,
+    required String androidId,
+    required String fcmToken,
+    bool register = false,
+    String name = '',
+  }) async {
+    final body = <String, dynamic>{
+      'identifier': identifier,
+      'password': password,
+      'register': register,
+      'name': name,
+      'identity': androidId,
+      'fcmToken': fcmToken,
+      'country': session.getCountry(),
+      'ip': session.getIpAddress(),
+    };
+
+    final referralCode = session.getPendingReferralCode();
+    if (referralCode != null && referralCode.isNotEmpty) {
+      body[Const.referralCode] = referralCode;
+    }
+
+    try {
+      body['deviceId'] = await DeviceIdentityService.getDeviceId(
+        session: session,
+      );
+      final res = await ApiService.loginPassword(body);
+      if (res.status && res.user != null) {
+        _persistUser(res.user!);
+        session.clearPendingReferralCode();
+        FcmService.instance.syncTokenToBackend().catchError((e) {
+          Log.e(_tag, 'FCM token sync after login failed', e);
+        });
+        _checkTempBlock(res.user!.id ?? '');
+      }
+      return res;
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map) {
+        return UserRoot.fromJson(Map<String, dynamic>.from(data));
+      }
+      return UserRoot(status: false, message: e.message);
+    }
+  }
+
   /// Internal helper: calls [ApiService.createUser], persists the result,
   /// and applies the auth token to [ApiClient].
   Future<UserRoot> _doLogin(Map<String, dynamic> body) async {

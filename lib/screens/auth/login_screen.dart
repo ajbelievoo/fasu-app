@@ -46,7 +46,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   late final AnimationController _entrance;
   late final AnimationController _tilt;
   final _referralCtrl = TextEditingController();
+  final _identifierCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   bool _showReferral = false;
+  bool _registerMode = false;
 
   VideoPlayerController? _videoCtrl;
   bool _videoReady = false;
@@ -95,6 +99,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _entrance.dispose();
     _tilt.dispose();
     _referralCtrl.dispose();
+    _identifierCtrl.dispose();
+    _passwordCtrl.dispose();
+    _nameCtrl.dispose();
     _videoCtrl?.dispose();
     super.dispose();
   }
@@ -162,6 +169,50 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     }
     if (session.getIpAddress().isEmpty) {
       session.saveIpAddress('0.0.0.0');
+    }
+  }
+
+  Future<void> _passwordLogin() async {
+    final identifier = _identifierCtrl.text.trim();
+    final password = _passwordCtrl.text;
+    if (identifier.isEmpty) {
+      Fluttertoast.showToast(msg: 'Enter username, email or phone');
+      return;
+    }
+    if (password.length < 6) {
+      Fluttertoast.showToast(msg: 'Password must be at least 6 characters');
+      return;
+    }
+    if (_registerMode && _nameCtrl.text.trim().isEmpty) {
+      Fluttertoast.showToast(msg: 'Enter your name to create account');
+      return;
+    }
+
+    setState(() => _loading = true);
+    final auth = context.read<AuthProvider>();
+    final session = context.read<SessionManager>();
+    final identity = await _deviceIdentity();
+    final fcmToken = await _fcmToken();
+    await _ensureCountryAndIp();
+
+    try {
+      final res = await auth.passwordLogin(
+        identifier: identifier,
+        password: password,
+        androidId: identity,
+        fcmToken: fcmToken,
+        register: _registerMode,
+        name: _nameCtrl.text.trim(),
+      );
+      _handleResult(res, session);
+      if (!res.status) {
+        Fluttertoast.showToast(msg: res.message ?? 'Login failed');
+      }
+    } catch (e, s) {
+      Log.e(_tag, 'password login failed', e, s);
+      Fluttertoast.showToast(msg: 'Login failed: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -297,6 +348,33 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     _buildReferral(),
 
                     const SizedBox(height: 12),
+
+                    // --- Password login (username / email / phone) ---
+                    GlassTextField(controller: _identifierCtrl, hint: 'Username, email or phone'),
+                    const SizedBox(height: 10),
+                    GlassTextField(controller: _passwordCtrl, hint: 'Password', obscure: true),
+                    if (_registerMode) ...[
+                      const SizedBox(height: 10),
+                      GlassTextField(controller: _nameCtrl, hint: 'Your name'),
+                    ],
+                    const SizedBox(height: 12),
+                    GlassButton(
+                      label: _registerMode ? 'Create account' : 'Login',
+                      onTap: _passwordLogin,
+                      loading: _loading,
+                      icon: Icons.lock_outline,
+                      solid: true,
+                      solidGradient: const [Color(0xFF6C5CE7), Color(0xFFE84393)],
+                    ),
+                    const SizedBox(height: 6),
+                    GestureDetector(
+                      onTap: _loading ? null : () => setState(() => _registerMode = !_registerMode),
+                      child: Text(
+                        _registerMode ? 'Already have an account? Login' : 'New here? Create account',
+                        style: const TextStyle(color: Color(0xFFE84393), fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
 
                     // --- Login buttons (glass) ---
                     GlassButton(label: 'Continue with Google', onTap: _googleLogin, loading: _loading, leading: Container(width: 22, height: 22, decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle), child: const Icon(Icons.g_mobiledata, size: 18, color: Colors.red))),
