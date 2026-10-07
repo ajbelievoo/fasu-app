@@ -164,6 +164,10 @@ jobs:
           sed -i '' 's|assert(dependent._dependencies!.contains(this));|/* sim-build: dependent check */|' "$F"
           # multi-line ancestor assert inside notifyClients
           perl -0777 -pi -e 's|assert\(\(\) \{\n\s+// check that it really is our descendant\n\s+Element\? ancestor = dependent\._parent;\n\s+while \(ancestor != this && ancestor != null\) \{\n\s+ancestor = ancestor\._parent;\n\s+\}\n\s+return ancestor == this;\n\s+\}\(\)\);|/* sim-build: ancestor assert removed */|s' "$F"
+          # markNeedsBuild-during-build / locked-tree asserts (debug-only —
+          # release marks the element dirty and rebuilds next frame anyway)
+          perl -0777 -pi -e 's|assert\(\(\) \{\n      if \(owner!\._debugBuilding\) \{|assert(() {\n      if (false \&\& owner!._debugBuilding) {|s' "$F"
+          perl -0777 -pi -e 's|\} else if \(owner!\._debugStateLocked\) \{\n        throw FlutterError\.fromParts|} else if (false) {\n        throw FlutterError.fromParts|s' "$F"
           grep -cn "sim-build" "$F" 
 
       - name: Build iOS simulator app
