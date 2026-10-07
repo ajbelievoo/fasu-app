@@ -72,7 +72,7 @@ jobs:
 
       - name: Ensure GoogleService-Info.plist (optional)
         env:
-          UNILIVE_GOOGLE_SERVICE_INFO: ${{ secrets.UNILIVE_GOOGLE_SERVICE_INFO }}
+          UNILIVE_GOOGLE_SERVICE_INFO: ${{ secrets.UNILIVE_GOOGLE_SERVICE_INFO || secrets.FIREBASE || secrets.FIREBASEPLIST }}
         run: |
           if [ -n "$UNILIVE_GOOGLE_SERVICE_INFO" ]; then
             echo "$UNILIVE_GOOGLE_SERVICE_INFO" | base64 -d > ios/Runner/GoogleService-Info.plist
@@ -132,6 +132,10 @@ jobs:
         run: |
           mkdir -p build/ios/ipa/Payload
           cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          if [ -f ios/Runner/GoogleService-Info.plist ]; then
+            cp ios/Runner/GoogleService-Info.plist build/ios/ipa/Payload/Runner.app/
+            echo "::notice::Bundled GoogleService-Info.plist into device app"
+          fi
           cd build/ios/ipa
           zip -qry ../unilive.ipa Payload
           ls -lh ../unilive.ipa
@@ -164,6 +168,10 @@ jobs:
       - name: Package simulator .app
         run: |
           cd build/ios/iphonesimulator
+          if [ -f ../../../ios/Runner/GoogleService-Info.plist ]; then
+            cp ../../../ios/Runner/GoogleService-Info.plist Runner.app/
+            echo "::notice::Bundled GoogleService-Info.plist into simulator app"
+          fi
           xcrun vtool -show-build Runner.app/Runner \
             | grep -i 'platform\|minos' | while IFS= read -r l; do echo "::notice::vtool:$l"; done
           mkdir -p ../appetize
