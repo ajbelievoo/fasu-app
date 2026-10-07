@@ -111,7 +111,7 @@ jobs:
 
       - name: Build unsigned iOS app
         env:
-          UNILIVE_API_KEY: ${{ secrets.UNILIVE_API_KEY || secrets.UNILIVEAPIKEY }}
+          UNILIVE_API_KEY: ${{ secrets.UNILIVE_API_KEY || secrets.UNILIVEAPIKEY || secrets.APIKEY }}
           UNILIVE_POSITIONSTACK_KEY: ${{ secrets.UNILIVE_POSITIONSTACK_KEY }}
           UNILIVE_FACEBOOK_APP_ID: ${{ secrets.UNILIVE_FACEBOOK_APP_ID }}
         run: |
@@ -145,7 +145,7 @@ jobs:
 
       - name: Build iOS simulator app
         env:
-          UNILIVE_API_KEY: ${{ secrets.UNILIVE_API_KEY || secrets.UNILIVEAPIKEY }}
+          UNILIVE_API_KEY: ${{ secrets.UNILIVE_API_KEY || secrets.UNILIVEAPIKEY || secrets.APIKEY }}
           UNILIVE_POSITIONSTACK_KEY: ${{ secrets.UNILIVE_POSITIONSTACK_KEY }}
           UNILIVE_FACEBOOK_APP_ID: ${{ secrets.UNILIVE_FACEBOOK_APP_ID }}
         run: |
