@@ -161,7 +161,10 @@ jobs:
         run: |
           F="$FLUTTER_ROOT/packages/flutter/lib/src/widgets/framework.dart"
           sed -i '' 's|assert(_dependents.isEmpty);|/* sim-build: assert(_dependents.isEmpty); */|' "$F"
-          grep -n "sim-build: assert(_dependents.isEmpty)" "$F" | head -1
+          sed -i '' 's|assert(dependent._dependencies!.contains(this));|/* sim-build: dependent check */|' "$F"
+          # multi-line ancestor assert inside notifyClients
+          perl -0777 -pi -e 's|assert\(\(\) \{\n\s+// check that it really is our descendant\n\s+Element\? ancestor = dependent\._parent;\n\s+while \(ancestor != this && ancestor != null\) \{\n\s+ancestor = ancestor\._parent;\n\s+\}\n\s+return ancestor == this;\n\s+\}\(\)\);|/* sim-build: ancestor assert removed */|s' "$F"
+          grep -cn "sim-build" "$F" 
 
       - name: Build iOS simulator app
         env:
