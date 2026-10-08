@@ -1354,6 +1354,8 @@ class _DiscoveryTabState extends State<_DiscoveryTab>
           agoraUID: room.agoraUID,
           view: room.view,
           audio: true,
+          isPublic: room.isPublic,
+          privateCode: room.privateCode,
         );
         final session = context.read<SessionManager>();
         final roomHostId = room.userId ?? room.liveUserId ?? '';

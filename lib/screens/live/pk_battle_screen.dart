@@ -23,6 +23,7 @@ import '../../constants/const.dart';
 import '../../models/live_stream_root.dart' as live_stream;
 import '../../models/live_user_root.dart' as live_user;
 import '../../routes/app_routes.dart';
+import '../../models/json_annotation_helper.dart';
 import '../../models/pk_call_models.dart';
 import '../../services/api_service.dart';
 import '../../services/session_manager.dart';
@@ -32,6 +33,7 @@ import '../../utils/format_utils.dart';
 import '../../utils/log.dart';
 import '../../utils/media_utils.dart';
 import '../../utils/vip_privilege_helper.dart';
+import '../../widgets/audio_room_comment_bubble.dart';
 import '../../widgets/big_gift_overlay.dart';
 import '../../widgets/gift_bottom_sheet.dart';
 import '../../widgets/gift_overlay.dart';
@@ -1907,10 +1909,10 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
                 )
                 : LayoutBuilder(
                   builder: (context, constraints) {
-                    final widthBasedHeight = (constraints.maxWidth * 0.92)
-                        .clamp(240.0, 400.0);
-                    final heightBasedLimit = (constraints.maxHeight - 280)
-                        .clamp(240.0, 400.0);
+                    final widthBasedHeight = (constraints.maxWidth * 0.80)
+                        .clamp(180.0, 300.0);
+                    final heightBasedLimit = (constraints.maxHeight - 300)
+                        .clamp(180.0, 300.0);
                     final videoHeight =
                         widthBasedHeight < heightBasedLimit
                             ? widthBasedHeight
@@ -3348,11 +3350,74 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
   }
 
   // --- Comments overlay ---
+  Widget _buildPkCommentBubble(PkComment c) {
+    final raw = c.raw ?? const <String, dynamic>{};
+    final userMap =
+        raw['user'] is Map
+            ? Map<String, dynamic>.from(raw['user'] as Map)
+            : const <String, dynamic>{};
+    final style = VipPrivilegeHelper.chatStyleFromPayload(
+      Map<String, dynamic>.from(raw),
+    );
+    final isVip =
+        raw['isVIP'] == true ||
+        raw['isVip'] == true ||
+        userMap['isVIP'] == true ||
+        userMap['isVip'] == true ||
+        style.isVip;
+    final vipLevel = parseInt(
+      raw['vipLevel'] ?? userMap['vipLevel'] ?? userMap['vipDetails']?['vipLevel'],
+      0,
+    );
+    final levelName = parseString(
+      userMap['level']?['name'] ?? userMap['levelName'] ?? raw['levelName'],
+    );
+    final frameUrl = parseString(
+      userMap['avatarFrameImage'] ?? raw['avatarFrame'] ?? raw['avatarFrameImage'],
+    );
+    final badgeUrls = <String>[
+      parseString(raw['vipBadgeUrl'] ?? userMap['vipBadgeUrl']) ?? '',
+      parseString(userMap['level']?['image']) ?? '',
+      if (userMap['tags'] is List)
+        ...(userMap['tags'] as List)
+            .map((t) => t is Map ? parseString(t['image']) : null)
+            .whereType<String>(),
+    ].where((s) => s.isNotEmpty).toList();
+    return AudioRoomCommentBubble(
+      comment: AudioRoomComment(
+        name: c.name,
+        text: c.message,
+        userId: c.userId,
+        isVIP: isVip,
+        isMine: c.userId == (SessionManager.instance?.userId ?? ''),
+        userImage: c.image,
+        frameUrl: frameUrl,
+        vipStyle: style,
+        vipLevel: vipLevel > 0 ? vipLevel : null,
+        chatBubbleId: style.chatBubbleId ?? (vipLevel > 0 ? vipLevel : null),
+        levelName: levelName?.isNotEmpty == true ? levelName : null,
+        country: parseString(raw['country'] ?? userMap['country']),
+        countryFlagImage: parseString(
+          raw['countryFlagImage'] ?? userMap['countryFlagImage'],
+        ),
+        familyName: parseString(raw['familyName'] ?? userMap['familyName']),
+        familyBadgeUrl: parseString(
+          raw['familyBadgeUrl'] ?? userMap['familyBadgeUrl'],
+        ),
+        isHost: raw['isHost'] == true || userMap['isHost'] == true,
+        isAdmin: raw['isAdmin'] == true || userMap['isAdmin'] == true,
+        badgeUrls: badgeUrls,
+      ),
+      myUserId: SessionManager.instance?.userId ?? '',
+      isHost: widget.isHost,
+    );
+  }
+
   Widget _buildCommentsOverlay() {
     if (_comments.isEmpty) return const SizedBox.shrink();
     final list = _comments.toList();
     return Container(
-      constraints: const BoxConstraints(maxWidth: 250, maxHeight: 200),
+      constraints: const BoxConstraints(maxWidth: 260, maxHeight: 200),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3361,53 +3426,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
               final idx = list.length - 1 - i;
               if (idx < 0) return const SizedBox.shrink();
               final c = list[idx];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (c.image != null && c.image!.isNotEmpty)
-                        UserAvatar(imageUrl: c.image, size: 20),
-                      if (c.image != null && c.image!.isNotEmpty)
-                        const SizedBox(width: 6),
-                      Flexible(
-                        child: Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: '${c.name ?? ''}: ',
-                                style: const TextStyle(
-                                  color: Colors.yellow,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              TextSpan(
-                                text: c.message ?? '',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
+              return _buildPkCommentBubble(c);
             }).reversed.toList(),
       ),
     );
@@ -3430,7 +3449,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
         widget.room?.liveUserId ??
         (widget.isHost1 ? _config.host1Id : _config.host2Id) ??
         '';
-    SocketService.instance.emit(Const.eventComment, {
+    final payload = <String, dynamic>{
       'comment': text,
       'liveStreamingId': liveId,
       'liveUserId': hostUserId,
@@ -3454,7 +3473,8 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
         'isVIP': user?.isVIP ?? false,
       },
       'type': 'comment',
-    });
+    };
+    SocketService.instance.emit(Const.eventComment, payload);
     // Render locally right away — socket echo is not guaranteed.
     setState(
       () => _comments.add(
@@ -3463,6 +3483,7 @@ class _PkBattleScreenState extends State<PkBattleScreen> {
           name: user?.name ?? session.userName,
           message: text,
           image: VideoUtil.getFullImageUrl(user?.image ?? session.userImage),
+          raw: payload,
         ),
       ),
     );

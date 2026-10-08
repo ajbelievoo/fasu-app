@@ -2000,6 +2000,13 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     }
   }
 
+  /// True when the join failure was a passcode rejection worth reprompting
+  /// for — as opposed to bans/offline/server errors that must not loop.
+  bool _isPasscodeRejection(String? message) {
+    final m = (message ?? '').toLowerCase();
+    return m.contains('passcode') || m.contains('private room');
+  }
+
   /// Prompt user for room passcode (private room).
   Future<String?> _promptPasscode() async {
     final ctrl = TextEditingController();
@@ -2198,6 +2205,21 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
               passcode: passcode,
             );
           }
+          // Backend-side passcode rejection (room went private after the
+          // list loaded, or a private room reached via profile/deep link
+          // where privateCode never came through) — ask once and retry.
+          if (!response.status && _isPasscodeRejection(response.message)) {
+            final retried = await _promptPasscode();
+            if (retried == null) {
+              if (mounted) Navigator.pop(context);
+              return;
+            }
+            response = await ApiService.joinAudioRoom(
+              roomId: _liveId,
+              userId: session.userId,
+              passcode: retried,
+            );
+          }
           if (!response.status) throw Exception(response.message);
 
           // Some backend versions return the full room in the join response.
@@ -2241,8 +2263,16 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           }
         } catch (e) {
           Log.e(_tag, 'joinAudioRoom API failed', e);
+          // Show the server's real reason (banned/offline/passcode) instead of
+          // a blanket passcode message that sent users hunting for a code
+          // they never needed.
+          final msg =
+              e is Exception ? e.toString().replaceFirst('Exception: ', '') : '';
           Fluttertoast.showToast(
-            msg: 'Incorrect passcode or room access denied',
+            msg:
+                msg.isNotEmpty && !msg.startsWith('Dio')
+                    ? msg
+                    : 'Could not join room. Please try again.',
           );
           if (mounted) Navigator.pop(context);
           return;
@@ -14351,9 +14381,22 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                   ],
                 ),
               ),
-              Text(
-                'ID: ${_roomUser.uniqueId ?? _roomUser.roomOwnerUniqueId ?? _roomUser.username ?? _roomUser.liveUserId ?? ''}',
-                style: const TextStyle(color: Colors.white70, fontSize: 9),
+              Builder(
+                builder: (context) {
+                  final rawId =
+                      _roomUser.uniqueId ??
+                      _roomUser.roomOwnerUniqueId ??
+                      _roomUser.username ??
+                      '';
+                  // Skip raw Mongo ObjectIds — show nothing instead.
+                  if (RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(rawId)) {
+                    return const SizedBox.shrink();
+                  }
+                  return Text(
+                    'ID: $rawId',
+                    style: const TextStyle(color: Colors.white70, fontSize: 9),
+                  );
+                },
               ),
               if (_roomUser.roomTags.isNotEmpty)
                 ConstrainedBox(

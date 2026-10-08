@@ -64,6 +64,8 @@ class LiveUser {
     this.category,
     this.broadcastType,
     this.musicPermission = 'host',
+    this.isPublic = true,
+    this.privateCode,
   });
 
   final String? id;
@@ -107,6 +109,8 @@ class LiveUser {
   seat; // Audio-room seat layout (empty for non-audio or list-only data)
   final String? category;
   final String? broadcastType;
+  final bool isPublic;
+  final int? privateCode;
   final String musicPermission;
 
   /// Convenience getters for compatibility with code that expects `userId`
@@ -213,6 +217,8 @@ class LiveUser {
       broadcastType: parseString(
         json['broadcastType'] ?? json['broadcast_type'],
       ),
+      isPublic: json['isPublic'] == null ? true : parseBool(json['isPublic']),
+      privateCode: parseIntOrNull(json['privateCode'] ?? json['passcode']),
       musicPermission:
           parseString(json['musicPermission'])?.toLowerCase() ?? 'host',
     ); // closes LiveUser(
@@ -244,7 +250,8 @@ class LiveUser {
     'liveStreamingType': liveStreamingType,
     'liveType': liveStreamingType,
     'isAudio': isAudio,
-    'isPublic': true,
+    'isPublic': isPublic,
+    'privateCode': privateCode,
     'isFake': isFake,
     'isPkMode': isPkMode,
     'isHostExists': isHostExists,

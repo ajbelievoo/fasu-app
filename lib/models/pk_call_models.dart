@@ -489,6 +489,7 @@ class PkComment {
     this.message,
     this.type,
     this.timeStamp,
+    this.raw,
   });
 
   final String? userId;
@@ -497,6 +498,9 @@ class PkComment {
   final String? message;
   final String? type; // 'comment', 'pkInvite', 'gift', etc.
   final int? timeStamp;
+  /// Full socket payload — needed to rebuild VIP chat styling
+  /// (vipDetails/badges/frames) for the bubble renderer.
+  final Map<String, dynamic>? raw;
 
   factory PkComment.fromJson(Map<String, dynamic> json) => PkComment(
     userId: parseString(json['userId']),
@@ -505,6 +509,7 @@ class PkComment {
     message: parseString(json['message'] ?? json['comment']),
     type: parseString(json['type']),
     timeStamp: (json['timeStamp'] as num?)?.toInt(),
+    raw: json,
   );
 }
 

@@ -5636,6 +5636,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         final map = data is Map ? data : null;
         if (map == null) return;
         final hostSide = parseString(map['hostSide']);
+        // Stray pkVote events (cross-room leaks, post-PK stragglers) must not
+        // flip a normal live into PK state — activation comes from pkStart.
+        if (!_isPkActive && _pkConfig == null) return;
         setState(() {
           _isPkActive = true;
           if (hostSide == 'host1') {
@@ -5654,6 +5657,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         final map = _unwrapCommentPayload(data);
         if (map.isEmpty || !mounted) return;
         final scores = _resolveIncomingPkScores(map);
+        // Same guard as pkVote — no score event may conjure a phantom PK.
+        if (!_isPkActive && _pkConfig == null) return;
         setState(() {
           _isPkActive = true;
           _pkScoreHost1 = scores.host1;
@@ -9365,6 +9370,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         dimensions: dims,
         bitrate: bitrate,
         frameRate: 15,
+        // Keep the published stream unmirrored — dropping mirrorMode here
+        // reverts it to auto, which flips the front camera for viewers.
+        mirrorMode: VideoMirrorModeType.videoMirrorModeDisabled,
       ),
     );
     Fluttertoast.showToast(msg: 'Quality: ${quality.toUpperCase()}');
@@ -12374,7 +12382,13 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
                         if (_showFromChatBanner) _buildFromChatBanner(),
                         if (_hostOffline) _buildOfflineBanner(),
                         _buildCommentsOverlay(),
-                        if (_isPkActive && _pkConfig == null)
+                        if (_isPkActive &&
+                            _pkConfig == null &&
+                            (_pkVoteCountHost1 +
+                                    _pkVoteCountHost2 +
+                                    _pkScoreHost1 +
+                                    _pkScoreHost2) >
+                                0)
                           _buildPkVoteBadges(),
                         if (_activeRoomPoll case final poll?)
                           Positioned(
@@ -13823,7 +13837,11 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   Widget _buildHostInfoBox() {
     final name = widget.liveUser.name;
     final hostName = (name != null && name.isNotEmpty) ? name : 'Host';
-    final uniqueId = _hostUniqueId ?? widget.liveUser.uniqueId ?? '';
+    final rawUniqueId = _hostUniqueId ?? widget.liveUser.uniqueId ?? '';
+    // Raw Mongo ObjectIds (24-hex) leak through when a host has no assigned
+    // uniqueId — hide instead of showing the ugly id to viewers.
+    final uniqueId =
+        RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(rawUniqueId) ? '' : rawUniqueId;
     final displayId = uniqueId.isNotEmpty ? 'ID: $uniqueId' : '';
     final relationshipType = widget.liveUser.relationshipType;
     return Container(
@@ -14076,6 +14094,11 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   /// Inline PK overlay — renders split-screen PK inside the live room,
   /// matching native UniLivePro's in-place PK composition. Comments, gifts,
   /// bottom bar, and all live-room functionality continue working.
+  /// PK overlay scale — phones smaller than the 390dp design width get
+  /// proportionally smaller chrome so videos/buttons fit small screens.
+  double get _pkScale =>
+      (MediaQuery.of(context).size.width / 390).clamp(0.78, 1.0);
+
   Widget _buildPkOverlay() {
     final config = _pkConfig;
     if (config == null) return const SizedBox.shrink();
@@ -14100,8 +14123,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     return Positioned.fill(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // PK split video panel height — responsive, matching native ~340dp.
-          final videoH = (constraints.maxHeight * 0.44).clamp(260.0, 330.0);
+          // PK split video panel height — shrinks on small screens so the
+          // score row, comments and controls all stay visible.
+          final videoH = (constraints.maxHeight * 0.40).clamp(190.0, 300.0);
           return Stack(
             children: [
               Positioned.fill(
@@ -14236,8 +14260,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
           child: IgnorePointer(
             child: Image.asset(
               'assets/images/live_pk_icon_vs.webp',
-              width: 44,
-              height: 36,
+              width: 44 * _pkScale,
+              height: 36 * _pkScale,
               fit: BoxFit.contain,
             ),
           ),
@@ -14346,7 +14370,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       Color(0xFFB0BEC5), // 2nd — silver
       Color(0xFFCD8B52), // 3rd — bronze
     ];
-    const rankSizes = [44.0, 38.0, 38.0];
+    final s = _pkScale;
+    final rankSizes = [42.0 * s, 36.0 * s, 36.0 * s];
     return Row(
       mainAxisAlignment:
           alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -14592,8 +14617,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         child: Center(
           child: Image.asset(
             resultAsset,
-            width: 110,
-            height: 110,
+            width: 92 * _pkScale,
+            height: 92 * _pkScale,
             fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
@@ -14610,7 +14635,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+        padding: EdgeInsets.symmetric(
+          horizontal: 20 * _pkScale,
+          vertical: 7 * _pkScale,
+        ),
         decoration: BoxDecoration(
           color: (color ?? Colors.white).withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(20),
@@ -14619,9 +14647,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         ),
         child: Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.black,
-            fontSize: 13,
+            fontSize: 13 * _pkScale,
             fontWeight: FontWeight.w900,
           ),
         ),

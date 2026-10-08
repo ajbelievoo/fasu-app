@@ -1027,7 +1027,11 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
               : const VideoDimensions(width: 640, height: 360); // auto
       final frameRate = index == 3 ? 30 : 15;
       await _engine.setVideoEncoderConfiguration(
-        VideoEncoderConfiguration(dimensions: dimensions, frameRate: frameRate),
+        VideoEncoderConfiguration(
+          dimensions: dimensions,
+          frameRate: frameRate,
+          mirrorMode: VideoMirrorModeType.videoMirrorModeDisabled,
+        ),
       );
       setState(() => _qualityIndex = index);
       Fluttertoast.showToast(
@@ -1710,7 +1714,11 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
             ? 15
             : 30;
     _engine.setVideoEncoderConfiguration(
-      VideoEncoderConfiguration(dimensions: dims, frameRate: fps),
+      VideoEncoderConfiguration(
+        dimensions: dims,
+        frameRate: fps,
+        mirrorMode: VideoMirrorModeType.videoMirrorModeDisabled,
+      ),
     );
     Log.d(
       _tag,
