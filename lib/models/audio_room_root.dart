@@ -18,13 +18,14 @@ String? _resolveString(
     // duplicates host-level fields at the root of a seat payload.
     if (fallback != null) {
       final fv = fallback[k];
-      if (fv != null) {
+      // Skip level/badge docs — their _id/name are level data, not identity.
+      if (fv != null && !(fv is Map && isLevelLikeMap(fv))) {
         final parsed = parseString(fv);
         if (parsed != null && parsed.isNotEmpty) return parsed;
       }
     }
     final v = json[k];
-    if (v != null) {
+    if (v != null && !(v is Map && isLevelLikeMap(v))) {
       final parsed = parseString(v);
       if (parsed != null && parsed.isNotEmpty) return parsed;
     }
@@ -38,13 +39,12 @@ String? _extractImageUrl(dynamic v) {
   if (v == null) return null;
   if (v is String) return v;
   if (v is Map) {
-    return (v['url'] ??
-            v['image'] ??
-            v['img'] ??
-            v['src'] ??
-            v['_id'] ??
-            v['id'])
-        ?.toString();
+    // A level/badge doc is never an avatar source.
+    if (isLevelLikeMap(v)) return null;
+    // `_id`/`id` are deliberately NOT a fallback — a raw ObjectId is not a
+    // URL; returning it produced https://cdn.../<objectid> garbage or worse,
+    // a level doc id bound to an identity field.
+    return (v['url'] ?? v['image'] ?? v['img'] ?? v['src'])?.toString();
   }
   return v.toString();
 }
@@ -141,12 +141,19 @@ class SeatItem {
 
   factory SeatItem.fromJson(Map<String, dynamic> json) {
     // Backend may nest the user details in `user`, `userId`, or at the root.
-    final userMap =
+    // GUARD: if the nested map is actually a level/badge document (payloads
+    // sometimes smuggle `level`/`hostLevel` objects into user slots), it must
+    // NOT supply identity — its _id points at the level collection and its
+    // name/image are "Level N" + a badge, which painted level data as the
+    // user's name/avatar in the profile card.
+    final rawUserMap =
         json['user'] is Map
             ? Map<String, dynamic>.from(json['user'] as Map)
             : (json['userId'] is Map
                 ? Map<String, dynamic>.from(json['userId'] as Map)
                 : null);
+    final userMap =
+        (rawUserMap != null && isLevelLikeMap(rawUserMap)) ? null : rawUserMap;
 
     final vipDetails =
         json['vipDetails'] is Map
@@ -167,12 +174,10 @@ class SeatItem {
     );
     var reserved = parseBool(json['reserved']);
 
-    String? userId = _resolveString(
-      json,
-      'userId',
-      fallback: userMap,
-      keys: const ['_id', 'id'],
-    );
+    String? userId =
+        parseUserId(json['userId']) ??
+        parseUserId(userMap) ??
+        _resolveString(json, 'userId', keys: const ['_id', 'id']);
     final name = _resolveString(
       json,
       'name',

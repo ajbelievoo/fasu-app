@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../constants/const.dart';
 import '../models/audio_room_root.dart';
 import '../models/guest_profile_root.dart';
+import '../models/json_annotation_helper.dart';
 import '../widgets/profile_badge_row.dart';
 import '../routes/app_routes.dart';
 import '../services/api_service.dart';
@@ -180,9 +181,11 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
     try {
       final profile = await ApiService.getGuestProfile(userId);
       if (!mounted) return;
+      final fetched = profile.user;
+      final fetchedId = fetched?.id ?? '';
       setState(() {
-        _user = profile.user;
-        _isFollow = profile.user?.isFollow ?? false;
+        _user = (fetchedId.isEmpty || fetchedId == userId) ? fetched : null;
+        _isFollow = _user?.isFollow ?? false;
         _loading = false;
       });
     } catch (e, s) {
@@ -496,7 +499,10 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
     return Container(
       height: halfHeight,
       decoration: BoxDecoration(
-        color: isVIP ? const Color(0xFF1E1B2E) : AppTheme.themed(context, 0xFF1E1B2E),
+        color:
+            isVIP
+                ? const Color(0xFF1E1B2E)
+                : AppTheme.themed(context, 0xFF1E1B2E),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: ClipRRect(
@@ -573,7 +579,9 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
                         shape: BoxShape.circle,
                       ),
                       child: UserAvatar(
-                        imageUrl: user?.image ?? seat.image,
+                        imageUrl:
+                            user?.image ??
+                            (looksLikeLevelName(seat.name) ? null : seat.image),
                         frameUrl:
                             (user?.avatarFrameImage?.isNotEmpty ?? false)
                                 ? user!.avatarFrameImage
@@ -620,7 +628,10 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
                 child: Container(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                   decoration: BoxDecoration(
-                    color: isVIP ? const Color(0xFF1E1B2E) : AppTheme.themed(context, 0xFF1E1B2E),
+                    color:
+                        isVIP
+                            ? const Color(0xFF1E1B2E)
+                            : AppTheme.themed(context, 0xFF1E1B2E),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.1),
@@ -639,7 +650,10 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
   }
 
   Widget _buildInfoColumn(SeatItem seat, GuestUser? user) {
-    final name = user?.name ?? seat.name ?? 'User';
+    // A level doc's name ("Level 12") is never the user's name — when the
+    // seat identity is that suspect, fall through to the generic 'User'.
+    final seatName = looksLikeLevelName(seat.name) ? null : seat.name;
+    final name = user?.name ?? seatName ?? 'User';
     final uniqueId = user?.uniqueId ?? '';
     final isVIP = (user?.isVIP ?? false) || seat.isVIP;
     final followers = user?.followers ?? 0;
@@ -762,8 +776,7 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
     final myUserId = session.userId;
     // Host viewing their own host seat counts as "me" — the seat may carry a
     // different id (liveUserId vs userId) which would hide self actions.
-    final isMe =
-        seat.userId == myUserId || (widget.isHostView && seat.isHost);
+    final isMe = seat.userId == myUserId || (widget.isHostView && seat.isHost);
     final isTargetHost = seat.isHost;
     final isTargetAdmin = seat.isAdmin;
     final amIHost = widget.isHostView;
@@ -1040,8 +1053,7 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
   Widget _buildBottomButtons(SeatItem seat) {
     final session = context.read<SessionManager>();
     final isMe =
-        seat.userId == session.userId ||
-        (widget.isHostView && seat.isHost);
+        seat.userId == session.userId || (widget.isHostView && seat.isHost);
 
     // Self view: no bottom buttons (Masti Live behaviour)
     if (isMe) {
@@ -1179,7 +1191,11 @@ class _ProfileRoomCardState extends State<_ProfileRoomCard> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  ImageIcon(AssetImage("assets/gift/official_gift.png"), color: Colors.white, size: 16),
+                  ImageIcon(
+                    AssetImage("assets/gift/official_gift.png"),
+                    color: Colors.white,
+                    size: 16,
+                  ),
                   SizedBox(width: 6),
                   Text(
                     'Send Gifts',

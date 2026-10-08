@@ -26,6 +26,8 @@ import '../../constants/const.dart';
 import '../../models/audio_room_root.dart';
 import '../../models/common_models.dart';
 import '../../models/host_compliance_models.dart';
+import '../../models/json_annotation_helper.dart'
+    show looksLikeUserEntry, parseUserId;
 import '../../models/live_stream_root.dart' as live_stream;
 import '../../models/user_root.dart';
 import '../../providers/ai_feature_manager.dart';
@@ -709,10 +711,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   void _syncLudoMic() {
     if (!_ludoPanelVisible) return;
     try {
-      final ids = _seats
-          .where((s) => s.isMuted && (s.userId ?? '').isNotEmpty)
-          .map((s) => s.userId!)
-          .toList();
+      final ids =
+          _seats
+              .where((s) => s.isMuted && (s.userId ?? '').isNotEmpty)
+              .map((s) => s.userId!)
+              .toList();
       _ludoCtrl.setMicMuted(ids);
     } catch (_) {}
   }
@@ -2267,7 +2270,9 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           // a blanket passcode message that sent users hunting for a code
           // they never needed.
           final msg =
-              e is Exception ? e.toString().replaceFirst('Exception: ', '') : '';
+              e is Exception
+                  ? e.toString().replaceFirst('Exception: ', '')
+                  : '';
           Fluttertoast.showToast(
             msg:
                 msg.isNotEmpty && !msg.startsWith('Dio')
@@ -10359,8 +10364,18 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         rawList = nested;
       } else if (nested is Map || nested is String || nested is num) {
         return _rawToViewers(nested);
-      } else if (data.values.any((v) => v is Map)) {
-        rawList = data.values.whereType<Map>().toList();
+      } else if (looksLikeUserEntry(data)) {
+        // Single-viewer payload (e.g. an `addView` join broadcast) — the map
+        // itself IS the entry. Its nested `level`/`vipDetails`/`hostLevel`/
+        // `user` maps are NOT viewers: sweeping `data.values` turned the
+        // Level doc into a ghost viewer whose userId was the level _id, so
+        // its profile card painted "Level 32" + the badge as identity.
+        rawList = [data];
+      } else if (data.values.any((v) => v is Map && looksLikeUserEntry(v))) {
+        // Map-of-viewers payload — keep only entry-shaped values; level /
+        // vipDetails / hostLevel docs must never become roster rows.
+        rawList =
+            data.values.whereType<Map>().where(looksLikeUserEntry).toList();
       } else if (data.isNotEmpty) {
         rawList = [data];
       }
@@ -10481,14 +10496,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         final userMapData =
             userMap is Map ? Map<String, dynamic>.from(userMap) : null;
         userId =
-            (data['userId'] ??
-                    data['viewerId'] ??
-                    data['id'] ??
-                    data['_id'] ??
-                    userMapData?['userId'] ??
-                    userMapData?['_id'] ??
-                    userMapData?['id'])
-                ?.toString();
+            parseUserId(data['userId']) ??
+            parseUserId(data['viewerId']) ??
+            parseUserId(data['id']) ??
+            parseUserId(data['_id']) ??
+            parseUserId(userMapData);
       } else if (data is String || data is num) {
         userId = data.toString();
       }

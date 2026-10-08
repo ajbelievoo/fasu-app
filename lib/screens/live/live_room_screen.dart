@@ -2978,12 +2978,16 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             liveStreamingId != liveId)
           return;
         final commentText = map['comment']?.toString() ?? '';
-        final userMap =
+        final rawUserMap =
             map['user'] is Map<String, dynamic>
                 ? map['user'] as Map<String, dynamic>
                 : (map['user'] is Map
                     ? Map<String, dynamic>.from(map['user'] as Map)
                     : <String, dynamic>{});
+        // Some payloads put a level/badge doc in the `user` slot — its
+        // name/image are "Level N" + a badge, not a person.
+        final userMap =
+            isLevelLikeMap(rawUserMap) ? <String, dynamic>{} : rawUserMap;
         // `??` alone can't skip empty names — accounts with `name:""`
         // (seen on VIP users) carry the display name in `username`.
         String pickName(dynamic v) =>
@@ -3004,10 +3008,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         final userName = resolvedName.isNotEmpty ? resolvedName : 'User';
         final imageUrl = map['imageUrl']?.toString() ?? '';
         final senderId =
-            map['userId']?.toString() ??
-            userMap['_id']?.toString() ??
-            userMap['id']?.toString() ??
-            '';
+            parseUserId(map['userId']) ?? parseUserId(userMap) ?? '';
         final userImage =
             map['image']?.toString() ?? userMap['image']?.toString() ?? '';
         final userFrame =
@@ -5993,19 +5994,20 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         final reactionImage = VideoUtil.getFullImageUrl(rawImage);
         final reactionName = map['name']?.toString() ?? '';
         final position = (map['position'] as num?)?.toInt() ?? -1;
-        final senderUser =
+        final rawSenderUser =
             map['user'] is Map
                 ? Map<String, dynamic>.from(map['user'] as Map)
                 : null;
+        final senderUser =
+            (rawSenderUser != null && isLevelLikeMap(rawSenderUser))
+                ? null
+                : rawSenderUser;
         final name =
             senderUser?['name']?.toString() ??
-            map['userId']?.toString() ??
+            parseUserId(map['userId']) ??
             'User';
         final reactUserId =
-            map['userId']?.toString() ??
-            senderUser?['_id']?.toString() ??
-            senderUser?['id']?.toString() ??
-            '';
+            parseUserId(map['userId']) ?? parseUserId(senderUser) ?? '';
 
         // Show reaction image/emoji centered over the host video for 7s.
         if (reactionImage.isNotEmpty || reactionName.isNotEmpty) {
@@ -6967,13 +6969,14 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   /// getGuestProfile API fetch.
   void _ensureCoHostIdentity(Map<String, dynamic> coHost) {
     final nested = coHost['user'];
-    final nestedMap = nested is Map ? nested : const <String, dynamic>{};
+    final nestedMap =
+        (nested is Map && !isLevelLikeMap(nested))
+            ? nested
+            : const <String, dynamic>{};
     var userId =
-        (coHost['userId'] ??
-                coHost['guestUserId'] ??
-                nestedMap['_id'] ??
-                nestedMap['userId'])
-            ?.toString() ??
+        parseUserId(coHost['userId']) ??
+        parseString(coHost['guestUserId']) ??
+        parseUserId(nestedMap) ??
         '';
     final entryUid = _coHostAgoraUid(coHost);
 
@@ -7180,10 +7183,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   /// both, so orphan controllers can still resolve a name.
   void _linkCoHostUid(Map<String, dynamic> map, int agoraUid) {
     final userId =
-        (map['userId'] ??
-                map['guestUserId'] ??
-                (map['user'] is Map ? map['user']['_id'] : null))
-            ?.toString();
+        parseUserId(map['userId']) ??
+        parseString(map['guestUserId']) ??
+        parseUserId(map['user']);
     if (agoraUid > 0 && userId != null && userId.isNotEmpty) {
       _coHostUidToUserId[agoraUid] = userId;
     }
@@ -7925,14 +7927,16 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   /// which arrives as either a single map or the participants array).
   void _handleCoHostJoinMap(Map<String, dynamic> map) {
     try {
-      final nestedUser = map['user'];
+      final rawNestedUser = map['user'];
+      // Guard: a level/badge doc in the `user` slot is not a person.
+      final nestedUser =
+          (rawNestedUser is Map && !isLevelLikeMap(rawNestedUser))
+              ? rawNestedUser
+              : null;
       final userId =
-          (map['userId'] ??
-                  map['guestUserId'] ??
-                  (nestedUser is Map
-                      ? nestedUser['_id'] ?? nestedUser['userId']
-                      : null))
-              ?.toString();
+          parseUserId(map['userId']) ??
+          parseString(map['guestUserId']) ??
+          parseUserId(nestedUser);
       if (userId == null || userId.isEmpty) return;
       // Roster entries use `isAccepted`; the guest's own emit uses `isAccept`.
       final isAccepted =
@@ -12837,7 +12841,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     }
 
     final nestedUser =
-        coHost['user'] is Map
+        (coHost['user'] is Map && !isLevelLikeMap(coHost['user'] as Map))
             ? coHost['user'] as Map
             : const <String, dynamic>{};
     final isMuted = parseBool(coHost['isMute'] ?? coHost['muted']);
@@ -12854,9 +12858,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
     // Hydrate missing name/image (join-request data or profile fetch) so the
     // tile shows the seated guest's real name instead of 'Guest'.
     _ensureCoHostIdentity(coHost);
-    final tileUserId =
-        (coHost['userId'] ?? nestedUser['_id'] ?? nestedUser['userId'])
-            ?.toString();
+    final tileUserId = parseUserId(coHost['userId']) ?? parseUserId(nestedUser);
     final cachedIdentity =
         _coHostProfileCache[tileUserId] ??
         _coHostProfileCache[_coHostUidToUserId[agoraUid]];
@@ -12901,10 +12903,9 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
             : null;
     // Track co-host box position for gift fly animation.
     final coHostUserId =
-        coHost['userId']?.toString() ??
-        coHost['guestUserId']?.toString() ??
-        nestedUser['_id']?.toString() ??
-        nestedUser['userId']?.toString() ??
+        parseUserId(coHost['userId']) ??
+        parseString(coHost['guestUserId']) ??
+        parseUserId(nestedUser) ??
         _coHostUidToUserId[agoraUid] ??
         '';
     if (coHostUserId.isNotEmpty) {
@@ -15263,7 +15264,8 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       _ensureCoHostIdentity(coHost);
       final uid = _coHostAgoraUid(coHost);
       userId =
-          (coHost['userId'] ?? coHost['guestUserId'])?.toString() ??
+          parseUserId(coHost['userId']) ??
+          parseString(coHost['guestUserId']) ??
           _coHostUidToUserId[uid] ??
           '';
     }

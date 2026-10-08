@@ -25,6 +25,90 @@ String? parseString(dynamic v, [String? defaultValue]) {
   return v.toString();
 }
 
+final RegExp _levelNamePattern = RegExp(
+  r'^\s*(host\s*)?level\s*\d*\s*$',
+  caseSensitive: false,
+);
+final RegExp _mongoIdPattern = RegExp(r'^[0-9a-fA-F]{24}$');
+
+/// True when [v] is a "level-like" backend document — a Level / HostLevel /
+/// VIP-tier / badge object — NOT a user identity map. Live socket payloads
+/// carry these inside `level`, `vipDetails`, `hostLevel`, `user` and even
+/// `userId` keys; treating them as user maps made profile cards and viewer
+/// rosters show "Level 12" + the badge as the user's name/avatar/id.
+bool isLevelLikeMap(Map v) {
+  if (v.containsKey('accessibleFunction')) return true;
+  final name = v['name']?.toString() ?? '';
+  if (!_levelNamePattern.hasMatch(name)) return false;
+  // A map carrying real user-identity fields is a user — even if its
+  // display name literally reads "Level N". Every actual level/badge doc
+  // observed lacks all of these.
+  const userKeys = [
+    'userId',
+    'userName',
+    'username',
+    'email',
+    'uniqueId',
+    'uniqueID',
+    'mobile',
+    'gender',
+    'country',
+    'dob',
+    'bio',
+    'followers',
+  ];
+  if (userKeys.any(v.containsKey)) return false;
+  return true;
+}
+
+/// True when a display string is literally "Level N" / "Host Level N" —
+/// level docs leaked into name slots produced exactly this text in
+/// profile cards and roster rows.
+bool looksLikeLevelName(String? v) =>
+    v != null && _levelNamePattern.hasMatch(v);
+
+/// True when a raw mongo ObjectId-shaped string — used to reject ids
+/// smuggled into display fields (name/image).
+bool looksLikeMongoId(String? v) => v != null && _mongoIdPattern.hasMatch(v);
+
+/// Resolves a USER id from [v] — a plain string or a user-shaped map.
+///
+/// Order inside a map is `userId` -> `_id` -> `id`: socket `user` payloads
+/// have proven to carry a WRONG identity in `id`/`_id` (e.g. the host's id)
+/// while `userId` is the real target. Returns null when [v] is null, is a
+/// level/badge document, or carries no id.
+String? parseUserId(dynamic v) {
+  if (v == null) return null;
+  if (v is String) return v.isNotEmpty ? v : null;
+  if (v is num) return v.toString();
+  if (v is! Map) return null;
+  if (isLevelLikeMap(v)) return null;
+  for (final k in const ['userId', '_id', 'id']) {
+    final x = v[k];
+    if (x is String && x.isNotEmpty) return x;
+    if (x is num) return x.toString();
+  }
+  return null;
+}
+
+/// True when [v] looks like a viewer/user entry map — carries at least one
+/// identity field (`userId`, `name`, `image`, `user`, `isAdd`) — as opposed
+/// to a nested sub-object (level doc, vipDetails, config). Used to filter
+/// generic map sweeps that otherwise turn `level`/`vipDetails` maps into
+/// ghost roster entries.
+bool looksLikeUserEntry(Map v) {
+  if (isLevelLikeMap(v)) return false;
+  // vipDetails / tier objects are not viewers either.
+  if (v.containsKey('tierId') || v.containsKey('vipTagUrl')) return false;
+  return v['userId'] != null ||
+      v['user'] is Map ||
+      v['name'] != null ||
+      v['userName'] != null ||
+      v['username'] != null ||
+      v['isAdd'] != null ||
+      v['image'] != null;
+}
+
 /// Parses an [int] from [v].
 ///
 /// Accepts [int], [double], numeric [String]s and [bool] (true -> 1).

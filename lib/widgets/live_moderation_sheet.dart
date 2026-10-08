@@ -160,12 +160,20 @@ class ViewerEntry {
   final String? vipNameColor;
 
   factory ViewerEntry.fromJson(Map<String, dynamic> json) {
-    final nestedUser =
+    final rawNestedUser =
         json['user'] is Map
             ? Map<String, dynamic>.from(json['user'] as Map)
             : (json['userId'] is Map
                 ? Map<String, dynamic>.from(json['userId'] as Map)
                 : <String, dynamic>{});
+    // Never treat a level/badge document as the nested user — its _id is the
+    // level collection's id and its name/image are "Level N" + badge, which
+    // painted level data as the viewer's identity in the profile card.
+    final nestedUser =
+        isLevelLikeMap(rawNestedUser) ? <String, dynamic>{} : rawNestedUser;
+    // The entry itself can also BE a level doc (ghost roster rows built by
+    // sweeping arbitrary map values).
+    final entryIsLevelDoc = isLevelLikeMap(json);
     final cpDetails =
         json['cpDetails'] is Map
             ? Map<String, dynamic>.from(json['cpDetails'] as Map)
@@ -178,8 +186,6 @@ class ViewerEntry {
             : (nestedUser['vipDetails'] is Map
                 ? Map<String, dynamic>.from(nestedUser['vipDetails'] as Map)
                 : <String, dynamic>{});
-    final rawUserId = json['userId'] is Map ? null : json['userId'];
-
     final rawLevel = json['level'] ?? nestedUser['level'];
     int? parsedLevel;
     String? parsedLevelName;
@@ -341,14 +347,12 @@ class ViewerEntry {
     );
 
     return ViewerEntry(
-      userId: parseString(
-        rawUserId ??
-            json['_id'] ??
-            json['id'] ??
-            nestedUser['userId'] ??
-            nestedUser['_id'] ??
-            nestedUser['id'],
-      ),
+      userId:
+          entryIsLevelDoc
+              ? null
+              : (parseUserId(json['userId']) ??
+                  parseUserId(nestedUser) ??
+                  parseString(json['_id'] ?? json['id'])),
       name: parseString(
         json['name'] ??
             json['userName'] ??
