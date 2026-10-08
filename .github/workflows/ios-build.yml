@@ -231,7 +231,7 @@ jobs:
           ZIPNAME: unilive-simulator.zip
         run: |
           set -e
-          REL_JSON=$(curl -sf "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/ios-simulator-latest")
+          REL_JSON=$(curl -sf -H "Authorization: Bearer $GH_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/ios-simulator-latest")
           ASSET_URL=$(echo "$REL_JSON" | python3 -c "import json,sys; a=json.load(sys.stdin)['assets']; print(next(x['url'] for x in a if x['name']=='$ZIPNAME'))")
           SIGNED=$(curl -sI -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$ASSET_URL" | grep -i '^location:' | cut -d' ' -f2 | tr -d '[:space:]')
           echo "Signed asset URL obtained (expires soon, appetize fetches immediately)"
