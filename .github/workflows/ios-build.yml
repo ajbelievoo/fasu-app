@@ -224,14 +224,20 @@ jobs:
       - name: Upload to Appetize
         if: github.event_name != "pull_request"
         continue-on-error: true
-        uses: appetizeio/github-action-appetize@v1.0.5
-        with:
-          apiToken: ${{ secrets.APPETIZE_API_TOKEN }}
-          appFile: build/ios/unilive-simulator.zip
-          publicKey: jphgt6zw52sk6tqon3tt4epzby
-          platform: ios
-          note: ${{ github.sha }}
-
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPETIZE_KEY: ${{ secrets.APPETIZE_API_TOKEN }}
+          PUBKEY: jphgt6zw52sk6tqon3tt4epzby
+          ZIPNAME: unilive-simulator.zip
+        run: |
+          set -e
+          REL_JSON=$(curl -sf "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/ios-simulator-latest")
+          ASSET_URL=$(echo "$REL_JSON" | python3 -c "import json,sys; a=json.load(sys.stdin)['assets']; print(next(x['url'] for x in a if x['name']=='$ZIPNAME'))")
+          SIGNED=$(curl -sI -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" "$ASSET_URL" | grep -i '^location:' | cut -d' ' -f2 | tr -d '[:space:]')
+          echo "Signed asset URL obtained (expires soon, appetize fetches immediately)"
+          curl -sf -X POST "https://api.appetize.io/v1/apps/$PUBKEY"             -H "X-API-KEY: $APPETIZE_KEY"             -F "url=$SIGNED"             -F "platform=ios"             -F "note=$GITHUB_SHA" | head -c 500
+          echo
+          echo "Appetize updated: https://appetize.io/app/$PUBKEY"
       - name: Upload failure logs
         if: failure()
         run: |
