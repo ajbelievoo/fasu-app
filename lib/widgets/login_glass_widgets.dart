@@ -52,7 +52,7 @@ class GlassButton extends StatefulWidget {
 }
 
 class _GlassButtonState extends State<GlassButton>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _press;
   late final AnimationController _glow;
   late final Animation<double> _scale;

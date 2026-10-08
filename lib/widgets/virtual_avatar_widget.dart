@@ -31,7 +31,7 @@ class VirtualAvatarWidget extends StatefulWidget {
 }
 
 class _VirtualAvatarWidgetState extends State<VirtualAvatarWidget>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   StreamSubscription<VirtualAvatarState>? _sub;
 
   Avatar? _avatar;
