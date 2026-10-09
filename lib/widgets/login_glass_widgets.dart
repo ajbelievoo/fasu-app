@@ -304,6 +304,12 @@ class _GlassTextFieldState extends State<GlassTextField> {
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
+              filled: false,
+              fillColor: Colors.transparent,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              errorBorder: InputBorder.none,
+              focusedErrorBorder: InputBorder.none,
               counterText: '',
               border: InputBorder.none,
               contentPadding:
