@@ -1,7 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:go_router/go_router.dart';
 
 import '../constants/const.dart';
+import '../routes/app_routes.dart';
+import '../routes/navigation_keys.dart' show rootNavigatorKey;
 import '../utils/log.dart';
 import 'session_manager.dart';
 
@@ -24,6 +28,41 @@ class ApiClient {
   }
 
   static String? getAuthToken() => _authToken;
+
+  static bool _reloginInProgress = false;
+
+  /// True when the stored profile has no account identifier, so a silent
+  /// token heal can never succeed (the only way out is a fresh login).
+  static bool _sessionUnhealable() {
+    final u = SessionManager.instance?.getUser();
+    if (u == null) return false;
+    return (u.mobileNumber ?? '').isEmpty &&
+        (u.googleEmail ?? '').isEmpty &&
+        (u.email ?? '').isEmpty;
+  }
+
+  /// A logged-in session that has no JWT and cannot heal makes every
+  /// protected call 401 and screens fail with generic errors ("Failed to
+  /// start audio live"). Expire it cleanly and send the user to login.
+  static void _forceRelogin() {
+    if (_reloginInProgress) return;
+    final session = SessionManager.instance;
+    if (session == null || !session.isLoggedIn) return;
+    _reloginInProgress = true;
+    try {
+      session.logout();
+      setAuthToken(null);
+      Fluttertoast.showToast(msg: 'Session expired. Please log in again.');
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx != null) GoRouter.of(ctx).goNamed(AppRoutes.login);
+    } catch (e) {
+      Log.w('AuthInterceptor', 'force re-login failed: $e');
+    } finally {
+      Future.delayed(const Duration(seconds: 5), () {
+        _reloginInProgress = false;
+      });
+    }
+  }
 
   /// Silently re-issue a session JWT via /user/loginSignup using whatever
   /// account identifiers the stored profile still has (mobile, email,
@@ -73,7 +112,8 @@ class ApiClient {
         final data = res.data;
         final userMap = data is Map ? data['user'] : null;
         final token = userMap is Map ? userMap['token'] : null;
-        final healedId = userMap is Map ? (userMap['_id'] ?? userMap['id']) : null;
+        final healedId =
+            userMap is Map ? (userMap['_id'] ?? userMap['id']) : null;
         // loginSignup CREATES a user when no identifier matches — a stale
         // stored email/mobile would mint a fresh account and silently steal
         // the session. Only adopt the token when it came back for the same
@@ -100,28 +140,32 @@ class ApiClient {
 
   /// Default client used by [ApiService] for regular JSON requests.
   static Dio create() {
-    final dio = Dio(BaseOptions(
-      baseUrl: Const.baseUrl,
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 30),
-      sendTimeout: const Duration(seconds: 30),
-      headers: {'key': Const.apiKey, 'Accept': 'application/json'},
-      responseType: ResponseType.json,
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: Const.baseUrl,
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 30),
+        headers: {'key': Const.apiKey, 'Accept': 'application/json'},
+        responseType: ResponseType.json,
+      ),
+    );
 
     // Certificate pinning for the main API server
     _attachCertificatePinning(dio);
 
     dio.interceptors.add(_AuthInterceptor(dio));
     if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        request: true,
-        requestHeader: false,
-        responseHeader: false,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => Log.d('HTTP', obj),
-      ));
+      dio.interceptors.add(
+        LogInterceptor(
+          request: true,
+          requestHeader: false,
+          responseHeader: false,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => Log.d('HTTP', obj),
+        ),
+      );
     }
 
     return dio;
@@ -131,29 +175,30 @@ class ApiClient {
   ///
   /// Uses a longer send timeout (120s) to accommodate large images/videos.
   static Dio createUpload() {
-    final dio = Dio(BaseOptions(
-      baseUrl: Const.baseUrl,
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 120),
-      headers: {
-        'key': Const.apiKey,
-        'Accept': 'application/json',
-      },
-      responseType: ResponseType.json,
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: Const.baseUrl,
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 120),
+        headers: {'key': Const.apiKey, 'Accept': 'application/json'},
+        responseType: ResponseType.json,
+      ),
+    );
 
     dio.interceptors.add(_AuthInterceptor(dio));
     _attachCertificatePinning(dio);
     if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        request: true,
-        requestHeader: false,
-        responseHeader: false,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => Log.d('HTTP-Upload', obj),
-      ));
+      dio.interceptors.add(
+        LogInterceptor(
+          request: true,
+          requestHeader: false,
+          responseHeader: false,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => Log.d('HTTP-Upload', obj),
+        ),
+      );
     }
 
     return dio;
@@ -163,24 +208,28 @@ class ApiClient {
   ///
   /// Has a different base URL and does not send the API key header.
   static Dio createIp() {
-    final dio = Dio(BaseOptions(
-      baseUrl: Const.ipApiUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
-      headers: {'Accept': 'application/json'},
-      responseType: ResponseType.json,
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: Const.ipApiUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 15),
+        headers: {'Accept': 'application/json'},
+        responseType: ResponseType.json,
+      ),
+    );
 
     if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        request: true,
-        requestHeader: false,
-        responseHeader: false,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => Log.d('HTTP-IP', obj),
-      ));
+      dio.interceptors.add(
+        LogInterceptor(
+          request: true,
+          requestHeader: false,
+          responseHeader: false,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => Log.d('HTTP-IP', obj),
+        ),
+      );
     }
 
     return dio;
@@ -188,24 +237,28 @@ class ApiClient {
 
   /// Client used for the PositionStack location lookup service.
   static Dio createLocation() {
-    final dio = Dio(BaseOptions(
-      baseUrl: Const.locationApiUrl,
-      connectTimeout: const Duration(seconds: 15),
-      receiveTimeout: const Duration(seconds: 15),
-      sendTimeout: const Duration(seconds: 15),
-      headers: {'Accept': 'application/json'},
-      responseType: ResponseType.json,
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: Const.locationApiUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+        sendTimeout: const Duration(seconds: 15),
+        headers: {'Accept': 'application/json'},
+        responseType: ResponseType.json,
+      ),
+    );
 
     if (kDebugMode) {
-      dio.interceptors.add(LogInterceptor(
-        request: true,
-        requestHeader: false,
-        responseHeader: false,
-        responseBody: true,
-        error: true,
-        logPrint: (obj) => Log.d('HTTP-Location', obj),
-      ));
+      dio.interceptors.add(
+        LogInterceptor(
+          request: true,
+          requestHeader: false,
+          responseHeader: false,
+          responseBody: true,
+          error: true,
+          logPrint: (obj) => Log.d('HTTP-Location', obj),
+        ),
+      );
     }
 
     return dio;
@@ -270,6 +323,8 @@ class _AuthInterceptor extends Interceptor {
           } catch (e) {
             Log.w('AuthInterceptor', 'post-heal retry failed: $e');
           }
+        } else if (ApiClient._sessionUnhealable()) {
+          ApiClient._forceRelogin();
         }
       }
     }
