@@ -30,13 +30,23 @@ class ApiClient {
   static String? getAuthToken() => _authToken;
 
   static bool _reloginInProgress = false;
+  static bool _healRefused = false;
+
+  /// Placeholder mobiles ("000000", all-same-digit, <7 digits) stored on
+  /// some legacy accounts must never be sent as a login/heal identifier —
+  /// the backend would match a DIFFERENT user sharing the placeholder and
+  /// silently merge identifiers into the wrong account.
+  static bool _isPlaceholderMobile(String? v) {
+    final d = (v ?? '').replaceAll(RegExp(r'\D'), '');
+    return d.isEmpty || d.length < 7 || RegExp(r'^(\d)\1+$').hasMatch(d);
+  }
 
   /// True when the stored profile has no account identifier, so a silent
   /// token heal can never succeed (the only way out is a fresh login).
   static bool _sessionUnhealable() {
     final u = SessionManager.instance?.getUser();
     if (u == null) return false;
-    return (u.mobileNumber ?? '').isEmpty &&
+    return _isPlaceholderMobile(u.mobileNumber) &&
         (u.googleEmail ?? '').isEmpty &&
         (u.email ?? '').isEmpty;
   }
@@ -84,7 +94,9 @@ class ApiClient {
       final body = <String, dynamic>{
         'loginType': u.loginType ?? 0,
         'fcmToken': u.fcmToken ?? '',
-        if ((u.mobileNumber ?? '').isNotEmpty) 'mobileNumber': u.mobileNumber,
+        if ((u.mobileNumber ?? '').isNotEmpty &&
+            !_isPlaceholderMobile(u.mobileNumber))
+          'mobileNumber': u.mobileNumber,
         if ((u.googleEmail ?? '').isNotEmpty) 'googleEmail': u.googleEmail,
         if ((u.email ?? '').isNotEmpty) 'email': u.email,
         if ((u.identity ?? '').isNotEmpty) 'identity': u.identity,
@@ -125,6 +137,7 @@ class ApiClient {
           SessionManager.instance?.saveUser(u.copyWith(token: token));
           return true;
         }
+        _healRefused = true;
         Log.w(
           'AuthInterceptor',
           'heal returned different user (${healedId} != ${u.id}) — refusing',
@@ -323,7 +336,7 @@ class _AuthInterceptor extends Interceptor {
           } catch (e) {
             Log.w('AuthInterceptor', 'post-heal retry failed: $e');
           }
-        } else if (ApiClient._sessionUnhealable()) {
+        } else if (ApiClient._sessionUnhealable() || ApiClient._healRefused) {
           ApiClient._forceRelogin();
         }
       }
