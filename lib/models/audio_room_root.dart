@@ -678,12 +678,16 @@ class AudioRoomUser {
 
   factory AudioRoomUser.fromJson(Map<String, dynamic> json) {
     final seat = parseList(json['seat'], SeatItem.fromJson);
-    // Native audio rooms use the seat array length + host as the source of
-    // truth. Fallback to 9 (8 grid + host) when the backend omits seatCount.
+    // `seatCount` is stored in PEOPLE semantics: owner seat (-1) + grid seats
+    // 0..seatCount-2. Values < 9 are legacy raw grid counts (or missing) —
+    // in that case derive the people count from the seat array itself.
+    // Never take max(parsed, computed): a stale inflated value persisted by
+    // an old client would re-create the phantom extra seat.
     final hasHostInSeat = seat.any((s) => s.position == -1 || s.isHost);
     final computedSeatCount = hasHostInSeat ? seat.length : seat.length + 1;
     final parsedSeatCount = parseInt(json['seatCount'], 0);
-    final effectiveSeatCount = max(9, max(parsedSeatCount, computedSeatCount));
+    final effectiveSeatCount =
+        parsedSeatCount >= 9 ? parsedSeatCount : max(9, computedSeatCount);
     final clampedSeatCount = effectiveSeatCount.clamp(9, 21);
 
     return AudioRoomUser(

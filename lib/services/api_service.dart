@@ -2419,7 +2419,14 @@ class ApiService {
   }) async {
     final r = await _dio.post(
       '/audioRoom/updateSeatCount',
-      data: {'roomId': roomId, 'seatCount': seatCount},
+      // Backend resolves the room via liveUserMongoId/liveStreamingId (roomId
+      // is accepted as a fallback). seatCount is TOTAL people incl. host.
+      data: {
+        'liveUserMongoId': roomId,
+        'liveStreamingId': roomId,
+        'roomId': roomId,
+        'seatCount': seatCount,
+      },
     );
     return RestResponse.fromJson(_asMap(r.data));
   }

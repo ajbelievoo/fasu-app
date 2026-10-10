@@ -1692,6 +1692,18 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         continue;
       }
 
+      // A grid seat flagged as host whose userId is NOT the room host is a
+      // mislabeled payload — demote it so host-only handling (owner-seat
+      // logic, host frame fallback) never applies to a regular sitter.
+      if (s.isHost && hostUserId.isNotEmpty && uid != hostUserId) {
+        Log.w(
+          _tag,
+          'SEAT_AUDIT _sanitizeSeats: demoting mislabeled host seat at '
+          'pos=${s.position} userId=$uid (host is $hostUserId)',
+        );
+        _seats[i] = _seats[i].copyWith(role: 'user');
+      }
+
       // Check for duplicate userId across grid seats (or duplicate of host).
       if (seenUserIds.contains(uid)) {
         Log.w(
@@ -8809,7 +8821,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   /// Opens the full room-type chooser (9/13/17/21 people) so the host can
   /// switch the audio room layout. Updates local seat count and broadcasts it.
   void _showSeatCountQuickPicker() async {
-    final currentPeople = max(_roomUser.seatCount, _seats.length).clamp(9, 21);
+    final currentPeople = _roomUser.seatCount.clamp(9, 21);
     final result = await Navigator.of(context).push<int>(
       MaterialPageRoute(
         builder: (_) => ChooseRoomTypeScreen(currentPeople: currentPeople),
@@ -10664,12 +10676,29 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                                     (e) => e.position == targetPos,
                                   );
                                   if (idx >= 0 && targetUserId.isNotEmpty) {
+                                    // Fresh SeatItem (never copyWith) — the
+                                    // previous occupant's avatarFrame/
+                                    // vipBadgeUrl/voiceWaveUrl would otherwise
+                                    // leak onto the new sitter (that's how a
+                                    // guest ended up wearing the host's frame).
+                                    final reqFrame =
+                                        req['avatarFrame']?.toString() ??
+                                        req['avatarFrameImage']?.toString();
+                                    final reqWave =
+                                        req['voiceWaveUrl']?.toString();
+                                    final reqVip =
+                                        req['isVIP'] == true ||
+                                        req['isVip'] == true;
+                                    final reqBadge =
+                                        req['vipBadgeUrl']?.toString();
                                     setState(() {
                                       _clearUserFromOtherSeats(
                                         targetUserId,
                                         exceptPosition: targetPos,
                                       );
-                                      _seats[idx] = _seats[idx].copyWith(
+                                      _seats[idx] = SeatItem(
+                                        position: targetPos,
+                                        lock: _seats[idx].lock,
                                         userId: targetUserId,
                                         name: targetName,
                                         image: targetImage,
@@ -10677,6 +10706,19 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                                         reserved: true,
                                         mute: 0,
                                         role: role,
+                                        avatarFrame:
+                                            reqFrame?.isNotEmpty == true
+                                                ? reqFrame
+                                                : null,
+                                        voiceWaveUrl:
+                                            reqWave?.isNotEmpty == true
+                                                ? reqWave
+                                                : null,
+                                        isVIP: reqVip,
+                                        vipBadgeUrl:
+                                            reqBadge?.isNotEmpty == true
+                                                ? reqBadge
+                                                : null,
                                       );
                                     });
                                     _updateSelfPosition();
@@ -10712,6 +10754,16 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                                     'isHost': false,
                                     'role': role,
                                     'reserved': true,
+                                    'avatarFrame':
+                                        req['avatarFrame']?.toString() ??
+                                        req['avatarFrameImage']?.toString(),
+                                    'voiceWaveUrl':
+                                        req['voiceWaveUrl']?.toString(),
+                                    'isVIP':
+                                        req['isVIP'] == true ||
+                                        req['isVip'] == true,
+                                    'vipBadgeUrl':
+                                        req['vipBadgeUrl']?.toString(),
                                   };
                                   SocketService.instance.emit(
                                     Const.eventAddParticipated,
@@ -14478,12 +14530,14 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   /// Build the seat grid. The host sits at the top owner seat (position -1)
   /// with the remaining seats in a grid below. Supports 4-12 grid seats.
   Widget _buildSeatGrid() {
-    // Use the larger of the declared count and the actual seat list length so
-    // a host's room-type change is visible even if a stale room state arrives.
-    final seatCount = max(_roomUser.seatCount, _seats.length).clamp(9, 21);
+    // seatCount is the authoritative configured PEOPLE count (owner + grid).
+    // Never derive it from _seats.length — the owner seat (-1) plus any stray
+    // out-of-range entries would inflate the grid and draw a phantom
+    // "No.9" seat that then gets persisted back to the backend.
+    final seatCount = _roomUser.seatCount.clamp(9, 21);
     // Total people includes the host at the top seat. Grid seats are positions
     // 0..seatCount-2, the top owner seat is position -1.
-    final targetSeats = (seatCount - 1).clamp(8, 20);
+    final targetSeats = seatCount - 1;
 
     // Top owner seat is position -1.
     final topSeat =
