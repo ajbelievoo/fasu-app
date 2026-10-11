@@ -1573,14 +1573,20 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         _amHost
             ? myUserId
             : (_roomUser.hostUserId ?? _roomUser.liveUserId ?? '');
+    // The empty owner-seat placeholder also has role:'host' — it must NOT
+    // count as "host is seated" or the real host never gets re-added when a
+    // refresh drops them (host invisible bug). Require an actual occupant.
+    final roomHostId = _roomUser.liveUserId ?? '';
     final hostInSeats = _seats.any(
       (s) =>
-          s.isHost ||
-          s.userId == _roomUser.liveUserId ||
-          s.userId == hostUserId,
+          (s.isHost && s.isOccupied) ||
+          (roomHostId.isNotEmpty && s.userId == roomHostId) ||
+          (hostUserId.isNotEmpty && s.userId == hostUserId),
     );
     final hostInGrid = _seats.any(
-      (s) => s.position >= 0 && (s.isHost || s.userId == hostUserId),
+      (s) =>
+          s.position >= 0 &&
+          (s.isHost || (hostUserId.isNotEmpty && s.userId == hostUserId)),
     );
 
     // If the host explicitly left their seat, don't force them back in until
