@@ -1671,7 +1671,25 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     }
     for (var i = 0; i < _seats.length; i++) {
       final s = _seats[i];
-      // Only sanitize grid seats, never the host/owner seat.
+      // Owner seat (-1) occupied by a non-host is a mislabeled entry —
+      // reset it to an empty host placeholder so a guest never keeps the
+      // owner seat's host identity/frame treatment.
+      if (s.position == -1) {
+        final topUid = s.userId ?? '';
+        if (s.isOccupied &&
+            hostUserId.isNotEmpty &&
+            topUid.isNotEmpty &&
+            topUid != hostUserId) {
+          Log.w(
+            _tag,
+            'SEAT_AUDIT _sanitizeSeats: clearing non-host on owner seat '
+            'userId=$topUid (host is $hostUserId)',
+          );
+          _seats[i] = SeatItem(position: -1, role: 'host');
+        }
+        continue;
+      }
+      // Only sanitize grid seats, never other negative-position entries.
       if (s.position < 0) continue;
 
       final uid = s.userId ?? '';
@@ -4393,6 +4411,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           Log.w(_tag, 'joinRequest: could not unwrap data=$data');
           return;
         }
+        if (!_isThisRoomEvent(map)) return;
         Log.d(
           _tag,
           'joinRequest parsed: userId=${map['userId']} name=${map['name']} position=${map['position']}',
@@ -4426,6 +4445,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       try {
         final map = _unwrapSocketData(data);
         if (map == null) return;
+        if (!_isThisRoomEvent(map)) return;
         // Backend may broadcast the FULL room state for addRequested (with
         // `seat` array) — same as native `handleSeatRefreshEvent`.
         if (_isFullRoomState(map)) {
@@ -14543,9 +14563,14 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     final topSeat =
         _seats.where((s) => s.position == -1).firstOrNull ??
         SeatItem(position: -1, role: 'host');
+    final myUserId = context.read<SessionManager>().userId;
+    // Only the actual host counts — a mislabeled seat at -1 (role 'host' but
+    // another user's id) must never be treated as the owner, or it inherits
+    // the host frame/badge below.
     final hostAtTop =
         topSeat.isOccupied &&
-        (topSeat.isHost || topSeat.userId == widget.roomUser.liveUserId);
+        (topSeat.userId == widget.roomUser.liveUserId ||
+            (_amHost && topSeat.userId == myUserId));
     final topKey = _seatKeys.putIfAbsent('seat_-1', () => GlobalKey());
 
     // Grid seats are positions 0..targetSeats-1 (exclude top/owner).
@@ -14579,15 +14604,20 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     bool isMusicPlaying = false,
   }) {
     final isHostUser = _amHost;
+    final myUserId = context.read<SessionManager>().userId;
     final occupied = topSeat.isOccupied;
     const avatarSize = 64.0;
     const containerSize = 78.0;
     final reactionImage = _seatReactions[-1]; // Host at top is position -1
     final reactionName = _seatReactionNames[-1];
+    final isRealHostSeat =
+        topSeat.userId != null &&
+        (topSeat.userId == widget.roomUser.liveUserId ||
+            (_amHost && topSeat.userId == myUserId));
     final avatarFrame =
         (topSeat.avatarFrame?.isNotEmpty ?? false)
             ? topSeat.avatarFrame
-            : (topSeat.isHost ? widget.roomUser.avatarFrameImage : null);
+            : (isRealHostSeat ? widget.roomUser.avatarFrameImage : null);
 
     return GestureDetector(
       key: seatKey,
@@ -14828,9 +14858,14 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     final topSeat =
         _seats.where((s) => s.position == -1).firstOrNull ??
         SeatItem(position: -1, role: 'host');
+    final myUserId = context.read<SessionManager>().userId;
+    // Only the actual host counts — a mislabeled seat at -1 (role 'host' but
+    // another user's id) must never be treated as the owner, or it inherits
+    // the host frame/badge below.
     final hostAtTop =
         topSeat.isOccupied &&
-        (topSeat.isHost || topSeat.userId == widget.roomUser.liveUserId);
+        (topSeat.userId == widget.roomUser.liveUserId ||
+            (_amHost && topSeat.userId == myUserId));
 
     final seats = <SeatItem>[
       topSeat,
