@@ -1408,7 +1408,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     _recentlyRemovedViewers[userId] = DateTime.now();
     // Clean old entries so the map doesn't grow forever.
     _recentlyRemovedViewers.removeWhere(
-      (_, t) => DateTime.now().difference(t).inSeconds > 5,
+      (_, t) => DateTime.now().difference(t).inSeconds > 20,
     );
   }
 
@@ -1417,7 +1417,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   bool _isRecentlyRemoved(String userId) {
     final removedAt = _recentlyRemovedViewers[userId];
     if (removedAt == null) return false;
-    if (DateTime.now().difference(removedAt).inSeconds > 3) {
+    if (DateTime.now().difference(removedAt).inSeconds > 15) {
       _recentlyRemovedViewers.remove(userId);
       return false;
     }
@@ -1554,7 +1554,9 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'isSystem': true,
     };
     try {
-      SocketService.instance.emit(Const.eventCommentAudio, payload);
+      // The server's `comment` handler re-broadcasts under both `comment`
+      // and `commentAudio` — emitting both here processed every comment
+      // twice (2x comment counter, double DB writes).
       SocketService.instance.emit(Const.eventComment, payload);
     } catch (_) {}
   }
@@ -3677,6 +3679,10 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       }
       setState(() {
         _viewers.removeWhere((viewer) => viewer.userId == targetUserId);
+        // A kicked user's pending seat request is dead — don't leave it in
+        // the host's request sheet.
+        _seatRequests.removeWhere((r) => r['userId'] == targetUserId);
+        _seatSpeakerService.removeFromQueue(targetUserId);
         if (targetUserId.isNotEmpty) _markViewerRemoved(targetUserId);
         for (var i = 0; i < _seats.length; i++) {
           if (_seats[i].userId == targetUserId) {
@@ -3724,6 +3730,18 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     });
     _cancelLessViewSub = socket.on(Const.eventLessView, (data) {
       if (data is Map && !_isThisRoomEvent(data)) return;
+      // A viewer who left can't still be asking for a seat — drop the stale
+      // request so the host's sheet doesn't show ghost entries.
+      if (data is Map) {
+        final lvUserId =
+            (data['userId'] ?? data['viewerUserId'] ?? data['id'])?.toString();
+        if (lvUserId != null && lvUserId.isNotEmpty) {
+          setState(() {
+            _seatRequests.removeWhere((r) => r['userId'] == lvUserId);
+          });
+          _seatSpeakerService.removeFromQueue(lvUserId);
+        }
+      }
       final didRemove = _tryRemoveViewerFromSocket(data);
       // Always decrement count when someone leaves — even if the viewer
       // wasn't in our local list (host, untracked viewer, etc).
@@ -4428,6 +4446,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           final name = map['name']?.toString() ?? 'User';
           final image = map['image']?.toString();
           if (userId != null &&
+              _seatRequests.length < 50 &&
               !_seatRequests.any((r) => r['userId'] == userId)) {
             setState(() => _seatRequests.add(map));
             // Also add to raise hand queue (ordered)
@@ -4468,6 +4487,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
           final image = map['image']?.toString();
           final reqPos = _parsePosition(map['position']);
           if (userId != null &&
+              _seatRequests.length < 50 &&
               !_seatRequests.any((r) => r['userId'] == userId)) {
             setState(() {
               _seatRequests.add(map);
@@ -4499,9 +4519,15 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         if (map == null) return;
         final userId = map['userId']?.toString();
         if (userId != null) {
-          setState(
-            () => _seatRequests.removeWhere((r) => r['userId'] == userId),
-          );
+          setState(() {
+            _seatRequests.removeWhere((r) => r['userId'] == userId);
+            // Host removed/rejected my request from their sheet — clear the
+            // local "request pending" state so my UI doesn't stay stuck.
+            if (userId == context.read<SessionManager>().userId &&
+                _myPendingSeatRequest != null) {
+              _myPendingSeatRequest = null;
+            }
+          });
           _seatSpeakerService.removeFromQueue(userId);
         }
       } catch (_) {}
@@ -6322,6 +6348,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
             1;
         if ((_amHost || _iAmAdmin) &&
             reqUserId != null &&
+            _seatRequests.length < 50 &&
             !_seatRequests.any((r) => r['userId'] == reqUserId)) {
           final entry = {
             'userId': reqUserId,
@@ -7016,7 +7043,6 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'wheatMode': _wheatMode,
       'isSystem': true,
     };
-    SocketService.instance.emit(Const.eventCommentAudio, commentModePayload);
     SocketService.instance.emit(Const.eventComment, commentModePayload);
     Fluttertoast.showToast(
       msg: _wheatMode ? 'Free Join Mode enabled' : 'Request Mode enabled',
@@ -7222,20 +7248,11 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
               old.mute > 0) {
             _seats[i] = _seats[i].copyWith(mute: old.mute);
           }
-          if ((s.voiceWaveUrl ?? '').isEmpty &&
-              (old.voiceWaveUrl ?? '').isNotEmpty) {
-            _seats[i] = _seats[i].copyWith(voiceWaveUrl: old.voiceWaveUrl);
-          }
-          if (!s.isVIP && old.isVIP) {
-            _seats[i] = _seats[i].copyWith(
-              isVIP: true,
-              vipBadgeUrl: old.vipBadgeUrl,
-            );
-          }
-          if ((s.avatarFrame ?? '').isEmpty &&
-              (old.avatarFrame ?? '').isNotEmpty) {
-            _seats[i] = _seats[i].copyWith(avatarFrame: old.avatarFrame);
-          }
+        }
+        // A seat that just emptied — drop its seat-coin counter so a stale
+        // rCoin badge can't show on the next occupant of this slot.
+        if ((s.userId ?? '').isEmpty && (old.userId ?? '').isNotEmpty) {
+          _seatCounters.remove(old.userId);
         }
       }
       Log.d(_tag, 'SEAT_AUDIT full room state seats from backend:');
@@ -7699,7 +7716,6 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       if (_mentionedUserName != null) 'mentionedUserName': _mentionedUserName,
     };
     SocketService.instance.emit(Const.eventComment, commentPayload);
-    SocketService.instance.emit(Const.eventCommentAudio, commentPayload);
     // Clear mention after sending
     _mentionedUserId = null;
     _mentionedUserName = null;
@@ -7766,9 +7782,10 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         'position': targetPosition,
         'isVIP': user?.isVIP ?? false,
         'isVip': user?.isVIP ?? false,
+        'avatarFrame':
+            user?.avatarFrameImage ?? user?.vipDetails?.profileFrameUrl,
       },
     };
-    SocketService.instance.emit(Const.eventCommentAudio, seatReqComment);
     SocketService.instance.emit(Const.eventComment, seatReqComment);
     Fluttertoast.showToast(msg: 'Request sent — waiting for host approval');
   }
@@ -8890,17 +8907,6 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       'lock': lock,
       'seatCount': _roomUser.seatCount,
     });
-
-    // Per-seat fallback: some backends/clients only handle single-seat lock.
-    for (final seat in affected) {
-      SocketService.instance.emit(Const.eventLockSeat, {
-        'liveUserId': liveUserId,
-        'liveUserMongoId': widget.roomUser.id,
-        'liveStreamingId': _liveId,
-        'position': seat.position,
-        'lock': lock,
-      });
-    }
 
     Fluttertoast.showToast(
       msg: lock ? 'All seats locked' : 'All seats unlocked',
@@ -10473,14 +10479,19 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       setState(() {
         _viewers.clear();
         final hostId = widget.roomUser.liveUserId;
+        final myViewerId = context.read<SessionManager>().userId;
         // Real viewers only — host has its own seat / top section.
+        // Invisible (VIP hide-online) viewers are hidden from the roster for
+        // everyone except themselves and host/admin.
+        final canSeeInvisible = _amHost || _iAmAdmin;
         final uniqueViewers = <String, ViewerEntry>{};
         for (final viewer in parsed) {
           final userId = viewer.userId;
           if (userId != null &&
               userId.isNotEmpty &&
               userId != hostId &&
-              !_isRecentlyRemoved(userId)) {
+              !_isRecentlyRemoved(userId) &&
+              (!viewer.invisible || canSeeInvisible || userId == myViewerId)) {
             uniqueViewers[userId] = viewer;
           }
         }
@@ -15867,71 +15878,6 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
                   ),
                 );
               }).toList(),
-        ),
-      ),
-    );
-  }
-
-  /// Custom accessory toolbar shown directly above the system keyboard
-  /// (apps / chat / GIF / settings / voice emoji / room settings / mic).
-  Widget _buildKeyboardToolbar() {
-    const iconColor = Color(0xFF5F6273);
-    return Container(
-      height: 46,
-      margin: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _toolbarIcon(Icons.apps, _openReactions, iconColor),
-          _toolbarIcon(
-            Icons.chat_bubble_outline,
-            () => context.pushNamed(AppRoutes.chat),
-            iconColor,
-          ),
-          _toolbarText('GIF', iconColor, () {}),
-          _toolbarIcon(Icons.settings_outlined, _showPkMenu, iconColor),
-          _toolbarIcon(
-            Icons.sentiment_very_satisfied,
-            _openVoiceEmoji,
-            iconColor,
-          ),
-          _toolbarIcon(Icons.color_lens_outlined, _openSettings, iconColor),
-          _toolbarIcon(
-            _micEnabled ? Icons.mic : Icons.mic_off,
-            (_selfPosition != -1 || _amHost) ? _toggleMic : () {},
-            iconColor,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toolbarIcon(IconData icon, VoidCallback onTap, Color color) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 38,
-        height: 38,
-        alignment: Alignment.center,
-        child: Icon(icon, color: color, size: 22),
-      ),
-    );
-  }
-
-  Widget _toolbarText(String text, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 38,
-        height: 38,
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
         ),
       ),
     );
