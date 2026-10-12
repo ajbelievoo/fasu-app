@@ -3317,15 +3317,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         if (isGiftComment) {
           final gDedup = _giftDedupKey(map);
           if (_giftKeySeen(gDedup)) return;
-          // Pre-mark all receivers so the per-receiver echoes on
-          // liveUserGift/normalUserGift/gift are skipped.
-          if (map['receiverUserIds'] is List) {
-            final gId = map['giftId']?.toString() ?? '';
-            final gTs = map['timeStamp']?.toString() ?? '';
-            for (final r in (map['receiverUserIds'] as List)) {
-              _giftKeySeen('${senderId}_${gId}_${gTs}_$r');
-            }
-          }
+
           final gEvent = GiftQueueController.fromSocketData(map);
           final gImage =
               gEvent?.giftImage ??
@@ -6500,12 +6492,10 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         '';
     final giftId = map['giftId']?.toString() ?? '';
     final ts = map['timeStamp']?.toString() ?? '';
-    final receiverId =
-        map['receiverUserId']?.toString() ??
-        map['receiverId']?.toString() ??
-        '';
     if (senderId.isEmpty && giftId.isEmpty) return '';
-    return '${senderId}_${giftId}_${ts}_$receiverId';
+    // One send = ONE key — per-receiver and per-channel echoes must collapse
+    // to a single animation (was replaying once per receiver + channel).
+    return '${senderId}_${giftId}_$ts';
   }
 
   /// Returns true when [key] was already processed; otherwise records it.
@@ -15871,97 +15861,6 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
           ],
         ),
       ],
-    );
-  }
-
-  /// Custom accessory toolbar shown directly above the system keyboard
-  /// (apps / chat / GIF / settings / voice emoji / room settings / mic).
-  Widget _buildKeyboardToolbar() {
-    const iconColor = Color(0xFF5F6273);
-    return Container(
-      height: 46,
-      margin: const EdgeInsets.only(top: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _toolbarIcon(Icons.apps, _openReactions, iconColor),
-          _toolbarIcon(Icons.chat_bubble_outline, _openMessages, iconColor),
-          _toolbarText('GIF', iconColor, () {}),
-          _toolbarIcon(
-            Icons.settings_outlined,
-            widget.isHost ? _openHostMenu : _openAudienceMenu,
-            iconColor,
-          ),
-          _toolbarIcon(
-            Icons.sentiment_very_satisfied,
-            _openVoiceEmoji,
-            iconColor,
-          ),
-          _toolbarIcon(
-            Icons.color_lens_outlined,
-            _openRoomBackgroundPicker,
-            iconColor,
-          ),
-          _toolbarIcon(
-            _micEnabled ? Icons.mic : Icons.mic_off,
-            widget.isHost
-                ? _toggleMic
-                : (_isJoined ? _toggleCoHostMute : _toggleMic),
-            iconColor,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openVoiceEmoji() {
-    final session = context.read<SessionManager>();
-    final isVip = session.getUser()?.isVIP ?? false;
-    VoiceEmojiPicker.show(
-      context,
-      canUseVipExclusive: isVip,
-      onSelected: (emoji) {
-        SocketService.instance.emit('voiceEmoji', {
-          'liveStreamingId': widget.liveUser.liveRoomId ?? '',
-          'emojiId': emoji.id,
-          'senderId': session.userId,
-          'senderName': _resolveUserName(session.getUser(), fallback: ''),
-          'senderAvatar': session.getUser()?.image ?? '',
-        });
-      },
-    );
-  }
-
-  Widget _toolbarIcon(IconData icon, VoidCallback onTap, Color color) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        width: 38,
-        height: 38,
-        alignment: Alignment.center,
-        child: Icon(icon, color: color, size: 22),
-      ),
-    );
-  }
-
-  Widget _toolbarText(String text, Color color, VoidCallback onTap) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Container(
-        width: 38,
-        height: 38,
-        alignment: Alignment.center,
-        child: Text(
-          text,
-          style: TextStyle(
-            color: color,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
     );
   }
 

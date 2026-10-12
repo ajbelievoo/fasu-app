@@ -874,14 +874,14 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
         map['createdAt']?.toString() ??
         map['timestamp']?.toString() ??
         DateTime.now().millisecondsSinceEpoch.toString();
-    final receiverId =
-        map['receiverUserId']?.toString() ?? map['toUserId']?.toString() ?? '';
+    // One send = ONE key — the same gift is broadcast on 3-4 event
+    // channels (gift/normalUserGift/liveUserGift/gift-comment) and once per
+    // receiver in a batch; including receiverId let every echo replay.
     return _giftDedupKeyFrom(
       senderId: senderId,
       giftId: giftId,
       count: count,
       timeStamp: timeStamp,
-      receiverId: receiverId,
     );
   }
 
@@ -12791,17 +12791,14 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     // Pre-add dedup keys so the per-recipient socket echoes are skipped.
     final batchKey = '${session.userId}_${giftId}_$timeStamp';
     _processedGiftBatchCommentKeys.add(batchKey);
-    for (final id in receiverIds) {
-      _processedGiftKeys.add(
-        _giftDedupKeyFrom(
-          senderId: session.userId,
-          giftId: giftId,
-          count: count,
-          timeStamp: timeStamp.toString(),
-          receiverId: id,
-        ),
-      );
-    }
+    _processedGiftKeys.add(
+      _giftDedupKeyFrom(
+        senderId: session.userId,
+        giftId: giftId,
+        count: count,
+        timeStamp: timeStamp.toString(),
+      ),
+    );
 
     if (!_effectSettings.showGiftEffect) {
       GiftSoundService.instance.playSendSound();
