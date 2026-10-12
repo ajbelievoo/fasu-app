@@ -84,8 +84,7 @@ class _BeliveApp extends StatefulWidget {
   State<_BeliveApp> createState() => _BeliveAppState();
 }
 
-class _BeliveAppState extends State<_BeliveApp>
-    with WidgetsBindingObserver {
+class _BeliveAppState extends State<_BeliveApp> with WidgetsBindingObserver {
   Future<SessionManager>? _initFuture;
   AIFeatureManager? _aiFeatureManager;
 
@@ -113,7 +112,10 @@ class _BeliveAppState extends State<_BeliveApp>
     // When the app is not resumed the incoming call should use the native
     // heads-up notification (with ring) instead of the in-app banner.
     PushNotificationService.isAppOpen = state == AppLifecycleState.resumed;
-    Log.d('_BeliveAppState', 'lifecycle=$state, isAppOpen=${PushNotificationService.isAppOpen}');
+    Log.d(
+      '_BeliveAppState',
+      'lifecycle=$state, isAppOpen=${PushNotificationService.isAppOpen}',
+    );
     // Presence broadcast — native emits userOnline on resume and
     // userOffline on pause/destroy so other users see correct status.
     if (state == AppLifecycleState.resumed) {
@@ -138,9 +140,9 @@ class _BeliveAppState extends State<_BeliveApp>
     // for gesture/hidden navigation. Platform channel calls can hang on odd
     // devices — box them so the launch never wedges.
     try {
-      await SystemUiService.instance
-          .applyDefault()
-          .timeout(const Duration(seconds: 4));
+      await SystemUiService.instance.applyDefault().timeout(
+        const Duration(seconds: 4),
+      );
     } catch (e) {
       debugPrint('[Main] applyDefault timed out/failed: $e');
     }
@@ -158,7 +160,9 @@ class _BeliveAppState extends State<_BeliveApp>
     debugPrint('[Main] SessionManager creating...');
     SessionManager session;
     try {
-      session = await SessionManager.create().timeout(const Duration(seconds: 5));
+      session = await SessionManager.create().timeout(
+        const Duration(seconds: 5),
+      );
       debugPrint('[Main] SessionManager created SUCCESS');
     } catch (e) {
       debugPrint('[Main] SessionManager error: $e');
@@ -217,8 +221,12 @@ class _BeliveAppState extends State<_BeliveApp>
   void _initAiFeatures(SessionManager session) {
     try {
       final ai = AIFeatureManager(session: session);
-      ai.loadCached().catchError((e) => debugPrint('[Main] AI loadCached error: $e'));
-      ai.fetchActiveFeatures().catchError((e) => debugPrint('[Main] AI fetch error: $e'));
+      ai.loadCached().catchError(
+        (e) => debugPrint('[Main] AI loadCached error: $e'),
+      );
+      ai.fetchActiveFeatures().catchError(
+        (e) => debugPrint('[Main] AI fetch error: $e'),
+      );
       ai.startPeriodicRefresh();
       _aiFeatureManager = ai;
     } catch (e) {
@@ -234,7 +242,9 @@ class _BeliveAppState extends State<_BeliveApp>
     }
     // Connect socket and subscribe to global events (matches native MySocketManager)
     if (session.userId.isNotEmpty) {
-      SocketService.instance.connect(session.userId, authToken: token).catchError((e) => debugPrint('[Main] Socket connect error: $e'));
+      SocketService.instance
+          .connect(session.userId, authToken: token)
+          .catchError((e) => debugPrint('[Main] Socket connect error: $e'));
       SocketHandlers.instance.subscribeAll();
     }
     // CRITICAL: Push notification init MUST complete before the router builds,
@@ -248,11 +258,15 @@ class _BeliveAppState extends State<_BeliveApp>
     }
     // Other services can still be fire-and-forget.
     DeepLinkService.instance.init().catchError((e) => debugPrint(e.toString()));
-    InstallReferrerService.instance.init().catchError((e) => debugPrint(e.toString()));
+    InstallReferrerService.instance.init().catchError(
+      (e) => debugPrint(e.toString()),
+    );
     IapService.instance.init().catchError((e) => debugPrint(e.toString()));
     ThemeProvider.instance.init().catchError((e) => debugPrint(e.toString()));
     // Preload the default gift sound for low-latency playback on send/receive.
-    GiftSoundService.instance.init().catchError((e) => debugPrint('[Main] GiftSound init error: $e'));
+    GiftSoundService.instance.init().catchError(
+      (e) => debugPrint('[Main] GiftSound init error: $e'),
+    );
   }
 
   /// Adds bottom padding for visible 3/2-button navigation bars so the app
@@ -301,10 +315,20 @@ class _BeliveAppState extends State<_BeliveApp>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Image.asset('assets/images/unilive_logo.png', width: 96, height: 96),
+                    Image.asset(
+                      'assets/images/unilive_logo.png',
+                      width: 96,
+                      height: 96,
+                    ),
                     const SizedBox(height: 16),
-                    const Text('Unilive',
-                        style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Unilive',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 32),
                     const Preloader(color: Colors.white),
                   ],
@@ -323,63 +347,88 @@ class _BeliveAppState extends State<_BeliveApp>
   /// FutureBuilder can launch it with a fallback session on init error.
   Widget _buildApp(SessionManager session) {
     return MultiProvider(
-          providers: [
-            Provider<SessionManager>.value(value: session),
-            if (_aiFeatureManager != null)
-              ChangeNotifierProvider<AIFeatureManager>.value(value: _aiFeatureManager!)
-            else
-              ChangeNotifierProvider<AIFeatureManager>(create: (_) => AIFeatureManager(session: session)),
-            ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider(session)),
-            ChangeNotifierProvider<LiveProvider>(create: (_) => LiveProvider()),
-            ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
-            ChangeNotifierProvider<GiftProvider>(create: (_) => GiftProvider()),
-            ChangeNotifierProvider<FeedProvider>(create: (_) => FeedProvider()),
-            ChangeNotifierProvider<WalletProvider>(create: (_) => WalletProvider()),
-            ChangeNotifierProvider<StoreProvider>(create: (_) => StoreProvider()),
-            ChangeNotifierProvider<FamilyProvider>(create: (_) => FamilyProvider()),
-            ChangeNotifierProvider<CpProvider>(create: (_) => CpProvider()),
-            ChangeNotifierProvider<FriendProvider>(create: (_) => FriendProvider()),
-            ChangeNotifierProvider<AgencyProvider>(create: (_) => AgencyProvider()),
-            ChangeNotifierProvider<KycProvider>(create: (_) => KycProvider()),
-            ChangeNotifierProvider<CallProvider>(create: (_) => CallProvider()),
-            ChangeNotifierProvider<NotificationProvider>(create: (_) => NotificationProvider()),
-            ChangeNotifierProvider<ProfileProvider>(create: (_) => ProfileProvider()),
-            ChangeNotifierProvider<VipProvider>(create: (_) => VipProvider()),
-            ChangeNotifierProvider<LeaderboardProvider>(create: (_) => LeaderboardProvider()),
-            ChangeNotifierProvider<PkProvider>(create: (_) => PkProvider()),
-            ChangeNotifierProvider<AudioRoomProvider>(create: (_) => AudioRoomProvider()),
-            ChangeNotifierProvider<CallRateProvider>(create: (_) => CallRateProvider()),
-            ChangeNotifierProvider<CallConfigProvider>(create: (_) => CallConfigProvider()),
-            ChangeNotifierProvider<MinimizedLiveProvider>(create: (_) => MinimizedLiveProvider()),
-            ChangeNotifierProvider<ThemeProvider>.value(value: ThemeProvider.instance),
-          ],
-          child: InAppNotificationBanner(
-            child: CpEffectsOverlay(
-              child: _IncomingCallHandler(
-              child: Builder(
-                  builder: (context) {
-                    // Flush any pending notification tap once the router is
-                    // built and the navigator has a valid context.
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      FcmService.instance.flushPendingNavigation();
-                      PushNotificationService.flushPendingNavigation();
-                    });
-                    return MaterialApp.router(
-                      title: 'Unilive',
-                      debugShowCheckedModeBanner: false,
-                      theme: AppTheme.lightTheme,
-                      darkTheme: AppTheme.darkTheme,
-                      themeMode: context.watch<ThemeProvider>().mode,
-                      routerConfig: AppRoutes.router,
-                      builder: (context, child) =>
-                          _bottomNavSafeBuilder(context, _BlockGuard(child: child!)),
-                    );
-                  },
-                ),
-              ),
+      providers: [
+        Provider<SessionManager>.value(value: session),
+        if (_aiFeatureManager != null)
+          ChangeNotifierProvider<AIFeatureManager>.value(
+            value: _aiFeatureManager!,
+          )
+        else
+          ChangeNotifierProvider<AIFeatureManager>(
+            create: (_) => AIFeatureManager(session: session),
+          ),
+        ChangeNotifierProvider<AuthProvider>(
+          create: (_) => AuthProvider(session),
+        ),
+        ChangeNotifierProvider<LiveProvider>(create: (_) => LiveProvider()),
+        ChangeNotifierProvider<ChatProvider>(create: (_) => ChatProvider()),
+        ChangeNotifierProvider<GiftProvider>(create: (_) => GiftProvider()),
+        ChangeNotifierProvider<FeedProvider>(create: (_) => FeedProvider()),
+        ChangeNotifierProvider<WalletProvider>(create: (_) => WalletProvider()),
+        ChangeNotifierProvider<StoreProvider>(create: (_) => StoreProvider()),
+        ChangeNotifierProvider<FamilyProvider>(create: (_) => FamilyProvider()),
+        ChangeNotifierProvider<CpProvider>(create: (_) => CpProvider()),
+        ChangeNotifierProvider<FriendProvider>(create: (_) => FriendProvider()),
+        ChangeNotifierProvider<AgencyProvider>(create: (_) => AgencyProvider()),
+        ChangeNotifierProvider<KycProvider>(create: (_) => KycProvider()),
+        ChangeNotifierProvider<CallProvider>(create: (_) => CallProvider()),
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (_) => NotificationProvider(),
+        ),
+        ChangeNotifierProvider<ProfileProvider>(
+          create: (_) => ProfileProvider(),
+        ),
+        ChangeNotifierProvider<VipProvider>(create: (_) => VipProvider()),
+        ChangeNotifierProvider<LeaderboardProvider>(
+          create: (_) => LeaderboardProvider(),
+        ),
+        ChangeNotifierProvider<PkProvider>(create: (_) => PkProvider()),
+        ChangeNotifierProvider<AudioRoomProvider>(
+          create: (_) => AudioRoomProvider(),
+        ),
+        ChangeNotifierProvider<CallRateProvider>(
+          create: (_) => CallRateProvider(),
+        ),
+        ChangeNotifierProvider<CallConfigProvider>(
+          create: (_) => CallConfigProvider(),
+        ),
+        ChangeNotifierProvider<MinimizedLiveProvider>(
+          create: (_) => MinimizedLiveProvider(),
+        ),
+        ChangeNotifierProvider<ThemeProvider>.value(
+          value: ThemeProvider.instance,
+        ),
+      ],
+      child: InAppNotificationBanner(
+        child: CpEffectsOverlay(
+          child: _IncomingCallHandler(
+            child: Builder(
+              builder: (context) {
+                // Flush any pending notification tap once the router is
+                // built and the navigator has a valid context.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  FcmService.instance.flushPendingNavigation();
+                  PushNotificationService.flushPendingNavigation();
+                });
+                return MaterialApp.router(
+                  title: 'Unilive',
+                  debugShowCheckedModeBanner: false,
+                  theme: AppTheme.lightTheme,
+                  darkTheme: AppTheme.darkTheme,
+                  themeMode: context.watch<ThemeProvider>().mode,
+                  routerConfig: AppRoutes.router,
+                  builder:
+                      (context, child) => _bottomNavSafeBuilder(
+                        context,
+                        _BlockGuard(child: child!),
+                      ),
+                );
+              },
             ),
           ),
-        );
+        ),
+      ),
+    );
   }
 }
 
@@ -486,8 +535,10 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
     }
     // Check if the caller is a VIP user (from the socket payload).
     final callerVipDetails = map['vipDetails'];
-    final isVipCaller = callerVipDetails is Map &&
-        (callerVipDetails['isActive'] == true || callerVipDetails['isVIP'] == true);
+    final isVipCaller =
+        callerVipDetails is Map &&
+        (callerVipDetails['isActive'] == true ||
+            callerVipDetails['isVIP'] == true);
     if (!isVipCaller) return;
     Log.d(_tag, 'VIP auto-answer for caller $callerId');
     final token = map[Const.token]?.toString() ?? '';
@@ -520,7 +571,9 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
       Log.d(_tag, 'callCancel received — resetting guard');
       _resetCallState();
     });
-    _cancelCallAnswer = SocketService.instance.on(Const.eventCallAnswer, (data) {
+    _cancelCallAnswer = SocketService.instance.on(Const.eventCallAnswer, (
+      data,
+    ) {
       final map = _unwrapCallData(data);
       final isAccept = map['isAccept'] == true;
       // If the answer is from the OTHER party, always reset.
@@ -537,16 +590,24 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
       Log.d(_tag, 'callAnswer received (isAccept=$isAccept) — resetting guard');
       _resetCallState();
     });
-    _cancelCallDisconnect = SocketService.instance.on(Const.eventCallDisconnect, (_) {
-      Log.d(_tag, 'callDisconnect received — resetting guard');
-      _resetCallState();
-    });
+    _cancelCallDisconnect = SocketService.instance.on(
+      Const.eventCallDisconnect,
+      (_) {
+        Log.d(_tag, 'callDisconnect received — resetting guard');
+        _resetCallState();
+      },
+    );
 
-    _cancelCallRequest = SocketService.instance.on(Const.eventCallRequest, (data) async {
+    _cancelCallRequest = SocketService.instance.on(Const.eventCallRequest, (
+      data,
+    ) async {
       if (_showingCall) {
         // Already handling a call — auto-decline with "busy" so the caller
         // gets an immediate response instead of waiting for a 45s timeout.
-        Log.d(_tag, 'callRequest ignored — already handling a call, sending busy');
+        Log.d(
+          _tag,
+          'callRequest ignored — already handling a call, sending busy',
+        );
         final map = _unwrapCallData(data);
         final callerId = map['userId2']?.toString() ?? '';
         final callRoomId = map['callRoomId']?.toString() ?? '';
@@ -579,8 +640,13 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
       // Only show the incoming call UI if this request is actually for me.
       // The socket may broadcast to both caller and receiver in some flows;
       // native checks userId1 == myUserId before showing the popup.
-      if (session != null && receiverId.isNotEmpty && receiverId != session.userId) {
-        Log.d(_tag, 'callRequest not for me (receiverId=$receiverId, myId=${session.userId})');
+      if (session != null &&
+          receiverId.isNotEmpty &&
+          receiverId != session.userId) {
+        Log.d(
+          _tag,
+          'callRequest not for me (receiverId=$receiverId, myId=${session.userId})',
+        );
         return;
       }
 
@@ -620,7 +686,10 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
       _showingCall = true;
 
       final isForeground = _lifecycle == AppLifecycleState.resumed;
-      Log.d(_tag, 'lifecycle=$_lifecycle, isForeground=$isForeground, showingCall=$_showingCall');
+      Log.d(
+        _tag,
+        'lifecycle=$_lifecycle, isForeground=$isForeground, showingCall=$_showingCall',
+      );
       if (isForeground) {
         // Foreground: show a top floating overlay banner so the host can keep
         // using the app (Bigo/Chamet style). Full-screen only opens from the
@@ -633,16 +702,18 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
 
     // Profile visit mention — emitted by backend when someone joins the
     // profile owner's live room via a profile tap (viaProfileUserId).
-    _cancelProfileMention =
-        SocketService.instance.on(Const.eventProfileVisitMention, (data) {
-          final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
-          final visitorName = map['visitorName']?.toString() ?? 'Someone';
-          Log.d(_tag, 'profileVisitMention: $map');
-          Fluttertoast.showToast(
-            msg: '$visitorName visited your profile and joined your room',
-            toastLength: Toast.LENGTH_LONG,
-          );
-        });
+    _cancelProfileMention = SocketService.instance.on(
+      Const.eventProfileVisitMention,
+      (data) {
+        final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+        final visitorName = map['visitorName']?.toString() ?? 'Someone';
+        Log.d(_tag, 'profileVisitMention: $map');
+        Fluttertoast.showToast(
+          msg: '$visitorName visited your profile and joined your room',
+          toastLength: Toast.LENGTH_LONG,
+        );
+      },
+    );
   }
 
   @override
@@ -652,7 +723,9 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
     PushNotificationService.isAppOpen = state == AppLifecycleState.resumed;
     // If the app is detached (killed by OS or user), emit a call cancel
     // so the other party isn't left waiting for a 45s timeout.
-    if (state == AppLifecycleState.detached && _showingCall && _callData != null) {
+    if (state == AppLifecycleState.detached &&
+        _showingCall &&
+        _callData != null) {
       Log.d(_tag, 'app detached — emitting callCancel for active call');
       final session = SessionManager.instance;
       SocketService.instance.emit(Const.eventCallCancel, {
@@ -681,8 +754,10 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
     final session = SessionManager.instance;
     if (session != null) {
       SocketService.instance.emit(Const.eventCallConfirmed, {
-        Const.userId1: callData.userId2 ?? '',
-        Const.userId2: session.userId,
+        // Convention: userId1 = receiver (me), userId2 = caller — the backend
+        // relays to userId2, so the caller gets the "Ringing" signal.
+        Const.userId1: session.userId,
+        Const.userId2: callData.userId2 ?? '',
         'isConfirm': true,
       });
     }
@@ -742,16 +817,18 @@ class _IncomingCallHandlerState extends State<_IncomingCallHandler>
     });
 
     // Navigate to active call screen using the global GoRouter.
-    AppRoutes.router.pushNamed(
-      AppRoutes.activeCall,
-      extra: {
-        'data': data,
-        'isAudioCall': data.isAudioCall,
-        'callByMe': false,
-      },
-    ).then((_) {
-      _resetCallState();
-    });
+    AppRoutes.router
+        .pushNamed(
+          AppRoutes.activeCall,
+          extra: {
+            'data': data,
+            'isAudioCall': data.isAudioCall,
+            'callByMe': false,
+          },
+        )
+        .then((_) {
+          _resetCallState();
+        });
   }
 
   void _declineCall() {

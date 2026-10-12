@@ -315,6 +315,7 @@ class Const {
 
   // 1-1 calls
   static const String eventCallReceive = 'callReceive';
+  static const String eventCallAlive = 'callAlive';
   static const String eventCallConfirmed = 'callConfirmed';
   static const String eventCallAnswer = 'callAnswer';
   static const String eventCallCancel = 'callCancel';

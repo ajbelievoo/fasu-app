@@ -705,10 +705,15 @@ class _ActiveCallScreenState extends State<ActiveCallScreen>
     // actual deduction; the client display is approximate.
     _coinTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!mounted) return;
+      final session = context.read<SessionManager>();
+      // Heartbeat for the server dead-call watchdog — both parties emit this
+      // so an app-kill on either side ends the call instead of ghosting.
+      SocketService.instance.emit(Const.eventCallAlive, {
+        'callRoomId': widget.data.callRoomId,
+      });
       // Only the paying caller emits deduction pings, and only after the
       // free-trial window has ended.
       if (!widget.callByMe || _isFreeCall || !_freeTrialEnded) return;
-      final session = context.read<SessionManager>();
       SocketService.instance.emit(Const.eventCallReceive, {
         'callId': widget.data.callRoomId,
         'callRoomId': widget.data.callRoomId,

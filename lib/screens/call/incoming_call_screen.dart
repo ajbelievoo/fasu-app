@@ -4,6 +4,7 @@
 /// accept/reject buttons. Uses SocketService for call events:
 /// `callReceive`, `callCancel`, `callDisconnect`.
 library incoming_call;
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -102,7 +103,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     _agoraToken = data.token ?? '';
     _channel = data.channel ?? (SessionManager.instance?.userId ?? '');
     _isAudioCall = data.isAudioCall;
-    Log.d(_tag, 'Incoming call from: $_callerName, callId: $_callId, audio: $_isAudioCall');
+    Log.d(
+      _tag,
+      'Incoming call from: $_callerName, callId: $_callId, audio: $_isAudioCall',
+    );
   }
 
   void _setupAnimations() {
@@ -134,8 +138,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
     final socket = SocketService.instance;
     final session = context.read<SessionManager>();
     socket.emit(Const.eventCallConfirmed, {
-      Const.userId1: _callerId,
-      Const.userId2: session.userId,
+      // Convention: userId1 = receiver (me), userId2 = caller — the backend
+      // relays to userId2, so the caller gets the "Ringing" signal.
+      Const.userId1: session.userId,
+      Const.userId2: _callerId,
       'isConfirm': true,
     });
 
@@ -203,11 +209,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
       );
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => ActiveCallScreen(
-            data: callData,
-            isAudioCall: _isAudioCall,
-            callByMe: false,
-          ),
+          builder:
+              (_) => ActiveCallScreen(
+                data: callData,
+                isAudioCall: _isAudioCall,
+                callByMe: false,
+              ),
         ),
       );
     }
@@ -298,7 +305,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    _isAudioCall ? 'Incoming Audio Call' : 'Incoming Video Call',
+                    _isAudioCall
+                        ? 'Incoming Audio Call'
+                        : 'Incoming Video Call',
                     style: TextStyle(
                       color: AppTheme.fg(context, 0.6),
                       fontSize: 15,
@@ -343,7 +352,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                               end: Alignment.bottomRight,
                               colors: [Color(0xFF7B61FF), Color(0xFF4F8DFD)],
                             ),
-                            border: Border.all(color: AppTheme.fg(context, 0.3), width: 3),
+                            border: Border.all(
+                              color: AppTheme.fg(context, 0.3),
+                              width: 3,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: AppTheme.primary.withValues(alpha: 0.4),
@@ -355,25 +367,41 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                           child: Padding(
                             padding: const EdgeInsets.all(4),
                             child: ClipOval(
-                              child: _callerImage.isNotEmpty
-                                  ? Image.network(
-                                      _callerImage,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Container(
-                                        color: AppTheme.primary,
-                                        child: const Icon(Icons.person, size: 60, color: Colors.white),
-                                      ),
-                                      loadingBuilder: (_, child, progress) => progress == null
-                                          ? child
-                                          : Container(
+                              child:
+                                  _callerImage.isNotEmpty
+                                      ? Image.network(
+                                        _callerImage,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (_, __, ___) => Container(
                                               color: AppTheme.primary,
-                                              child: const Icon(Icons.person, size: 60, color: Colors.white),
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 60,
+                                                color: Colors.white,
+                                              ),
                                             ),
-                                    )
-                                  : Container(
-                                      color: AppTheme.primary,
-                                      child: const Icon(Icons.person, size: 60, color: Colors.white),
-                                    ),
+                                        loadingBuilder:
+                                            (_, child, progress) =>
+                                                progress == null
+                                                    ? child
+                                                    : Container(
+                                                      color: AppTheme.primary,
+                                                      child: const Icon(
+                                                        Icons.person,
+                                                        size: 60,
+                                                        color: Colors.white,
+                                                      ),
+                                                    ),
+                                      )
+                                      : Container(
+                                        color: AppTheme.primary,
+                                        child: const Icon(
+                                          Icons.person,
+                                          size: 60,
+                                          color: Colors.white,
+                                        ),
+                                      ),
                             ),
                           ),
                         ),
@@ -404,7 +432,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
               const SizedBox(height: 50),
               // Accept / Reject buttons
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 30),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 50,
+                  vertical: 30,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -420,9 +451,10 @@ class _IncomingCallScreenState extends State<IncomingCallScreen>
                     ),
                     _CallButton(
                       onTap: _acceptCall,
-                      image: _isAudioCall
-                          ? 'assets/icon/invite_voice.webp'
-                          : 'assets/icon/invite_video.webp',
+                      image:
+                          _isAudioCall
+                              ? 'assets/icon/invite_voice.webp'
+                              : 'assets/icon/invite_video.webp',
                       label: 'Accept',
                       gradient: const LinearGradient(
                         begin: Alignment.topLeft,
@@ -460,19 +492,23 @@ class _CallButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(icon != null || image != null);
-    final child = image != null
-        ? Image.asset(
-            image!,
-            width: 34,
-            height: 34,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => Icon(
-              image?.contains('reject') == true ? Icons.call_end : Icons.call,
-              color: Colors.white,
-              size: 34,
-            ),
-          )
-        : Icon(icon, color: Colors.white, size: 34);
+    final child =
+        image != null
+            ? Image.asset(
+              image!,
+              width: 34,
+              height: 34,
+              fit: BoxFit.contain,
+              errorBuilder:
+                  (_, __, ___) => Icon(
+                    image?.contains('reject') == true
+                        ? Icons.call_end
+                        : Icons.call,
+                    color: Colors.white,
+                    size: 34,
+                  ),
+            )
+            : Icon(icon, color: Colors.white, size: 34);
 
     return GestureDetector(
       onTap: onTap,
@@ -520,10 +556,11 @@ class _RingPainter extends CustomPainter {
       final ringProgress = (progress + i * 0.33) % 1.0;
       final radius = 75.0 + ringProgress * 75;
       final alpha = (1 - ringProgress) * 0.25;
-      final paint = Paint()
-        ..color = AppTheme.primary.withValues(alpha: alpha)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+      final paint =
+          Paint()
+            ..color = AppTheme.primary.withValues(alpha: alpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2;
       canvas.drawCircle(center, radius, paint);
     }
   }
@@ -531,4 +568,3 @@ class _RingPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RingPainter oldDelegate) => true;
 }
-

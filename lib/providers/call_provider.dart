@@ -33,6 +33,14 @@ class CallProvider extends ChangeNotifier {
   String? _callRoomId;
   String? get callRoomId => _callRoomId;
 
+  // Peer identity — userId2 (caller) and userId1 (receiver) conventions.
+  // Needed so endCall can emit correct ids even when _incomingCall is null.
+  String? _peerUserId;
+  String? _callerUserId;
+  String? _receiverUserId;
+
+  bool _subscribed = false;
+
   int _callDuration = 0;
   int get callDuration => _callDuration;
 
@@ -41,57 +49,86 @@ class CallProvider extends ChangeNotifier {
   bool _loading = false;
   bool get loading => _loading;
 
-  final _incomingCallController = StreamController<IncomingCallData>.broadcast();
-  Stream<IncomingCallData> get incomingCallStream => _incomingCallController.stream;
+  final _incomingCallController =
+      StreamController<IncomingCallData>.broadcast();
+  Stream<IncomingCallData> get incomingCallStream =>
+      _incomingCallController.stream;
 
   final List<void Function()> _unsubscribers = [];
 
   void subscribeCallEvents() {
+    if (_subscribed) return;
+    _subscribed = true;
     // Listen for incoming call requests (matches native CallHandler.onCallRequest)
-    _unsubscribers.add(_socket.on(Const.eventCallRequest, (data) {
-      final callData = IncomingCallData.fromJson(data as Map<String, dynamic>);
-      _incomingCall = callData;
-      _incomingCallController.add(callData);
-      notifyListeners();
-    }));
+    _unsubscribers.add(
+      _socket.on(Const.eventCallRequest, (data) {
+        final callData = IncomingCallData.fromJson(
+          data as Map<String, dynamic>,
+        );
+        // Already in a call — instantly decline as busy so the caller is not
+        // left ringing for 45s and this call is not leaked into the UI.
+        if (_inCall) {
+          final session = SessionManager.instance;
+          _socket.emit(Const.eventCallAnswer, {
+            Const.userId1: session?.userId ?? callData.userId1,
+            Const.userId2: callData.userId2,
+            Const.callRoomId: callData.callRoomId,
+            Const.channel: callData.channel,
+            'isAccept': false,
+            'reason': 'busy',
+          });
+          return;
+        }
+        _incomingCall = callData;
+        _incomingCallController.add(callData);
+        notifyListeners();
+      }),
+    );
 
-    _unsubscribers.add(_socket.on(Const.eventCallConfirmed, (data) {
-      Log.d(_tag, 'Call confirmed by receiver');
-      // If needed, we can track "Ringing" state here.
-      notifyListeners();
-    }));
+    _unsubscribers.add(
+      _socket.on(Const.eventCallConfirmed, (data) {
+        Log.d(_tag, 'Call confirmed by receiver');
+        // If needed, we can track "Ringing" state here.
+        notifyListeners();
+      }),
+    );
 
-    _unsubscribers.add(_socket.on(Const.eventCallAnswer, (data) {
-      final map = data is Map ? data : {};
-      final isAccept = map['isAccept'] == true;
-      if (isAccept) {
-        _inCall = true;
-        _startDurationTimer();
-      } else {
-        final reason = map['reason']?.toString();
-        if (reason == 'busy') {
-          Fluttertoast.showToast(msg: 'User is busy on another call');
+    _unsubscribers.add(
+      _socket.on(Const.eventCallAnswer, (data) {
+        final map = data is Map ? data : {};
+        final isAccept = map['isAccept'] == true;
+        if (isAccept) {
+          _inCall = true;
+          _startDurationTimer();
         } else {
-          Fluttertoast.showToast(msg: 'Call declined');
+          final reason = map['reason']?.toString();
+          if (reason == 'busy') {
+            Fluttertoast.showToast(msg: 'User is busy on another call');
+          } else {
+            Fluttertoast.showToast(msg: 'Call declined');
+          }
+          _endCall();
+        }
+        notifyListeners();
+      }),
+    );
+
+    _unsubscribers.add(
+      _socket.on(Const.eventCallDisconnect, (data) {
+        final map = data is Map ? data : {};
+        final reason = map['reason']?.toString();
+        if (reason == 'insufficient_balance') {
+          Fluttertoast.showToast(msg: 'Call ended due to insufficient balance');
         }
         _endCall();
-      }
-      notifyListeners();
-    }));
+      }),
+    );
 
-    _unsubscribers.add(_socket.on(Const.eventCallDisconnect, (data) {
-      final map = data is Map ? data : {};
-      final reason = map['reason']?.toString();
-      if (reason == 'insufficient_balance') {
-        Fluttertoast.showToast(msg: 'Call ended due to insufficient balance');
-      }
-      _endCall();
-    }));
-
-    _unsubscribers.add(_socket.on(Const.eventCallCancel, (data) {
-      _incomingCall = null;
-      notifyListeners();
-    }));
+    _unsubscribers.add(
+      _socket.on(Const.eventCallCancel, (data) {
+        _endCall();
+      }),
+    );
   }
 
   Future<void> loadCallHistory(String userId) async {
@@ -126,13 +163,16 @@ class CallProvider extends ChangeNotifier {
         _isAudioCall = isAudioCall;
         _callByMe = true;
         _callRoomId = res.callId;
-        _startDurationTimer();
+        _callerUserId = userId1;
+        _receiverUserId = _peerUserId = userId2;
         // Emit socket event so the receiver gets notified (matches native
         // CallRequestActivity.initMain which emits EVENT_CALL_REQUEST).
         final session = SessionManager.instance;
         _socket.emit(Const.eventCallRequest, {
-          Const.userId1: userId2,          // receiver userId (native USERID1 = guestUser.getUserId())
-          Const.userId2: userId1,          // caller userId (native USERID2 = sessionManager.getUserId())
+          Const.userId1:
+              userId2, // receiver userId (native USERID1 = guestUser.getUserId())
+          Const.userId2:
+              userId1, // caller userId (native USERID2 = sessionManager.getUserId())
           'user2Name': session?.userName ?? '',
           'user2Image': session?.userImage ?? '',
           Const.callRoomId: res.callId,
@@ -168,6 +208,9 @@ class CallProvider extends ChangeNotifier {
       _inCall = true;
       _isAudioCall = call.isAudioCall;
       _callRoomId = call.callRoomId;
+      _peerUserId = call.userId2;
+      _callerUserId = call.userId2;
+      _receiverUserId = call.userId1;
       _incomingCall = null;
       _startDurationTimer();
       notifyListeners();
@@ -202,10 +245,14 @@ class CallProvider extends ChangeNotifier {
       }
       // Emit callDisconnect with full object payload so the backend can
       // identify caller/receiver and update the correct call record.
-      final call = _incomingCall;
+      // _incomingCall is null for the caller — use tracked peer ids.
+      final session = SessionManager.instance;
+      final myId = session?.userId;
+      final otherId = _peerUserId ?? _incomingCall?.userId2;
       _socket.emit(Const.eventCallDisconnect, {
-        Const.userId1: call?.userId1,
-        Const.userId2: call?.userId2,
+        // userId1 = receiver, userId2 = caller
+        Const.userId1: _callByMe ? otherId : (myId ?? _receiverUserId),
+        Const.userId2: _callByMe ? (myId ?? _callerUserId) : otherId,
         Const.callRoomId: _callRoomId,
       });
     }
@@ -228,6 +275,9 @@ class CallProvider extends ChangeNotifier {
     _callByMe = false;
     _callRoomId = null;
     _callDuration = 0;
+    _peerUserId = null;
+    _callerUserId = null;
+    _receiverUserId = null;
     _incomingCall = null;
     notifyListeners();
   }
