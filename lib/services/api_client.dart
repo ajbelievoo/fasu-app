@@ -23,7 +23,13 @@ class ApiClient {
   static Future<bool>? _healInFlight;
 
   /// Set the bearer token used for authenticated requests.
+  /// Only JWT-shaped tokens (three dot-separated segments) are accepted —
+  /// backend `user.token` has historically been clobbered with Agora room
+  /// tokens; storing those as auth 401s every userAuth endpoint.
   static void setAuthToken(String? token) {
+    if (token != null && token.isNotEmpty && token.split('.').length != 3) {
+      return;
+    }
     _authToken = token;
   }
 
