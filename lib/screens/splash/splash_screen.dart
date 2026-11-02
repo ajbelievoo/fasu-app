@@ -228,7 +228,7 @@ class _SplashScreenState extends State<SplashScreen>
                           ],
                         ),
                         child: Image.asset(
-                          'assets/images/unilive_logo.png',
+                          'assets/images/safu_logo.png',
                           width: 120,
                           height: 120,
                         ),

@@ -179,7 +179,7 @@ final CacheManager _safeImageCacheManager = CacheManager(
 // ignore: non_constant_identifier_names
 ImageProvider SafeImageProvider(String? url, {String? fallbackAsset}) {
   if (url == null || url.trim().isEmpty) {
-    return AssetImage(fallbackAsset ?? 'assets/images/unilive_logo.png');
+    return AssetImage(fallbackAsset ?? 'assets/images/safu_logo.png');
   }
   return CachedNetworkImageProvider(url, cacheManager: _safeImageCacheManager);
 }

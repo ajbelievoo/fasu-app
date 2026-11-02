@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Delete Your Belive / Unilive Account</title>
+  <title>Delete Your SAFU Live Account</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -57,7 +57,7 @@
   <div class="container">
     <h1>Request account deletion</h1>
     <p>
-      You can also request account and data deletion directly inside the Belive / Unilive app:<br />
+      You can also request account and data deletion directly inside the SAFU Live app:<br />
       <strong>Settings &gt; Account &gt; Delete Account</strong>
     </p>
 
@@ -83,8 +83,8 @@
     </form>
 
     <div class="footer">
-      Questions? Email <a href="mailto:support@unilive.me">support@unilive.me</a><br />
-      <a href="https://unilive.me/privacy.html">Privacy Policy</a>
+      Questions? Email <a href="mailto:support@iyolme.com">support@iyolme.com</a><br />
+      <a href="/privacy.html">Privacy Policy</a>
     </div>
   </div>
 
@@ -94,17 +94,17 @@
       const userId = document.getElementById('userId').value.trim();
       const reason = document.getElementById('reason').value.trim();
 
-      const subject = encodeURIComponent('Belive / Unilive account deletion request');
+      const subject = encodeURIComponent('SAFU Live account deletion request');
       const body = encodeURIComponent(
         'Hello,' + '\n\n' +
-        'I would like to permanently delete my Belive / Unilive account and all associated data.' + '\n\n' +
+        'I would like to permanently delete my SAFU Live account and all associated data.' + '\n\n' +
         'Registered email / phone: ' + email + '\n' +
         'User ID: ' + (userId || 'not provided') + '\n' +
         'Reason: ' + (reason || 'not provided') + '\n\n' +
         'Thank you.'
       );
 
-      window.location.href = 'mailto:support@unilive.me?subject=' + subject + '&body=' + body;
+      window.location.href = 'mailto:support@iyolme.com?subject=' + subject + '&body=' + body;
       return false; // keep user on the page after mailto opens
     }
   </script>

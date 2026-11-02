@@ -138,7 +138,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/logo/
     - assets/images/
     - assets/pk_live/
     - assets/icon/
@@ -156,8 +155,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/unilive_logo_app_icon.png"
+  image_path: "assets/images/safu_logo_app_icon.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/unilive_logo.png"
-  adaptive_icon_foreground_inset: 22
+  adaptive_icon_foreground: "assets/images/safu_icon_foreground.png"
   min_sdk_android: 23
