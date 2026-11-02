@@ -138,7 +138,6 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/logo/
     - assets/images/
     - assets/pk_live/
     - assets/icon/

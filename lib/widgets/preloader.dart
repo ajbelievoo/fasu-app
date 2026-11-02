@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// Global preloader — uses the animated GIF at `assets/logo/preloader.gif`.
+/// Global preloader — shows the SAFU Live logo at `assets/images/safu_logo.png`.
 ///
-/// Falls back to `CircularProgressIndicator` if the GIF fails to decode, so
+/// Falls back to `CircularProgressIndicator` if the image fails to decode, so
 /// callers that pass `color`, `strokeWidth`, etc. still get a matching loader.
 class Preloader extends StatelessWidget {
   final double? size;
@@ -40,7 +40,7 @@ class Preloader extends StatelessWidget {
           width: s,
           height: s,
           child: Image.asset(
-            'assets/logo/preloader.gif',
+            'assets/images/safu_logo.png',
             fit: BoxFit.contain,
             gaplessPlayback: true,
             errorBuilder: (context, error, stackTrace) {
