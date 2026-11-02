@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 /// matching [SystemUiOverlayStyle] settings so the status and navigation
 /// bars blend with the branded surfaces.
 ///
-/// Ported from the native UnilivePro theme resources.
+/// Ported from the native SAFU LivePro theme resources.
 class AppTheme {
   AppTheme._();
 

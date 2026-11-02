@@ -197,7 +197,7 @@ class _UpdateDialog extends StatelessWidget {
             Text(
               latestName.isNotEmpty
                   ? 'Version $latestName is here! You are on $currentName.'
-                  : 'A new version of UniLive is available.',
+                  : 'A new version of SAFU Live is available.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppTheme.fg(context, 0.7), fontSize: 14, height: 1.4),
             ),

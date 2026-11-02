@@ -24,7 +24,7 @@ import '../../utils/log.dart';
 import 'package:belive/widgets/login_animated_background.dart';
 import 'package:belive/widgets/login_glass_widgets.dart';
 
-/// Login screen with looping video background — UnilivePro style.
+/// Login screen with looping video background — SAFU LivePro style.
 ///
 /// Two entry points:
 ///  - Google sign-in (loginType 0)
@@ -151,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen>
     final session = context.read<SessionManager>();
     var id = session.getString('device_identity');
     if (id.isEmpty) {
-      id = 'unilive-${DateTime.now().millisecondsSinceEpoch}';
+      id = 'safu-${DateTime.now().millisecondsSinceEpoch}';
       session.saveString('device_identity', id);
     }
     return id;
@@ -513,7 +513,7 @@ class _LoginScreenState extends State<LoginScreen>
 
                                 const Spacer(flex: 2),
 
-                                // --- Terms & Conditions (UnilivePro style) ---
+                                // --- Terms & Conditions (SAFU LivePro style) ---
                                 const Text(
                                   'By Signing up you will be agree to our',
                                   style: TextStyle(
@@ -615,7 +615,7 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  /// Shimmering "Unilive" wordmark with a gradient + glow.
+  /// Shimmering "SAFU Live" wordmark with a gradient + glow.
   Widget _buildShimmerTitle() {
     const base = Color(0xFFFFFFFF);
     const highlight = Color(0xFFFDCB6E);
@@ -624,7 +624,7 @@ class _LoginScreenState extends State<LoginScreen>
       highlightColor: highlight,
       period: const Duration(seconds: 3),
       child: const Text(
-        'Unilive',
+        'SAFU Live',
         style: TextStyle(
           color: Colors.white,
           fontSize: 42,

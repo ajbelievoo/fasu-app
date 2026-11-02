@@ -12,7 +12,7 @@ import '../services/session_manager.dart';
 import '../services/socket_handlers.dart';
 import '../utils/log.dart';
 
-/// Mirrors native UnilivePro behaviour: every push / socket notification that
+/// Mirrors native SAFU LivePro behaviour: every push / socket notification that
 /// reaches the app is immediately saved to a local, persistent inbox as well as
 /// kept in sync with the backend `/notification/userList` API. This means:
 ///

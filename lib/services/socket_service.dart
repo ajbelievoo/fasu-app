@@ -8,7 +8,7 @@ import 'device_identity_service.dart';
 
 /// Ported from native `MySocketManager.java`.
 ///
-/// Wraps a single [sio.Socket] connection to the UnilivePro backend
+/// Wraps a single [sio.Socket] connection to the SAFU LivePro backend
 /// (`/socket.io/` namespace) and exposes typed helpers for the events
 /// used by Belive.
 ///

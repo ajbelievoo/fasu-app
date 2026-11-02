@@ -14,7 +14,7 @@ bool _isSupportedAvatarFormat(String url) {
 
 /// Animated sound/live waves around an avatar.
 ///
-/// Ported from the native UnilivePro home screen where online hosts
+/// Ported from the native SAFU LivePro home screen where online hosts
 /// show pulsing rings behind their profile picture.
 class WavesAvatar extends StatefulWidget {
   const WavesAvatar({

@@ -654,7 +654,7 @@ class GiftQueueController {
       final map = data is Map ? Map<String, dynamic>.from(data) : null;
       if (map == null) return null;
       // The `gift` field may arrive as a Map (some backends) or as a JSON
-      // STRING (native UnilivePro sends `new Gson().toJson(giftItem)` and
+      // STRING (native SAFU LivePro sends `new Gson().toJson(giftItem)` and
       // the backend echoes it). Handle both.
       Map<String, dynamic> nested = {};
       final rawGift = map['gift'];

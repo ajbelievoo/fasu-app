@@ -1175,7 +1175,7 @@ class _HostCenterScreenState extends State<HostCenterScreen>
     // Prefer the backend's completion flag when provided. When the backend
     // doesn't yet mark the task complete, still let the user try to claim —
     // the server may accept it once it sees the live duration update. This
-    // matches the native UnilivePro behaviour where the claim button appears
+    // matches the native SAFU LivePro behaviour where the claim button appears
     // as soon as the local progress bar reaches 100%.
     final backendCompleted = t.containsKey('completed') ? parseBool(t['completed']) : null;
     final timeDone = completedTime >= timeRequired;

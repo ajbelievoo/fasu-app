@@ -322,7 +322,7 @@ class _BeliveAppState extends State<_BeliveApp> with WidgetsBindingObserver {
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Unilive',
+                      'SAFU Live',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 32,
@@ -411,7 +411,7 @@ class _BeliveAppState extends State<_BeliveApp> with WidgetsBindingObserver {
                   PushNotificationService.flushPendingNavigation();
                 });
                 return MaterialApp.router(
-                  title: 'Unilive',
+                  title: 'SAFU Live',
                   debugShowCheckedModeBanner: false,
                   theme: AppTheme.lightTheme,
                   darkTheme: AppTheme.darkTheme,

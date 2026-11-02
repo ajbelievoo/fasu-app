@@ -23,7 +23,7 @@ import '../../widgets/user_avatar.dart';
 /// Premium message hub that groups chats, notifications, activity,
 /// family, feedback and "Say Hi" into one landing screen.
 ///
-/// Mirrors the UnilivePro message centre layout shown in the reference
+/// Mirrors the SAFU LivePro message centre layout shown in the reference
 /// screenshots: a branded header with category rows that carry icons,
 /// previews, timestamps and unread badges.
 class MessageHubScreen extends StatefulWidget {

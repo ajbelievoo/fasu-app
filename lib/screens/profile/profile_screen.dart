@@ -29,7 +29,7 @@ import 'medal_screen.dart';
 import 'package:belive/widgets/preloader.dart';
 
 /// Premium profile screen with glassmorphism, glow effects and a dating-app
-/// grade polish. Mirrors the native UnilivePro profile structure while using
+/// grade polish. Mirrors the native SAFU LivePro profile structure while using
 /// the Belive brand palette.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

@@ -1,4 +1,4 @@
-/// In-room Ludo panel — embeds the Ludo web game (ludo.unilive.me) inside the
+/// In-room Ludo panel — embeds the Ludo web game (ludo.iyolme.com) inside the
 /// audio room so seated players can play without leaving the room.
 ///
 /// The web page talks to the app through the `GameBridge` JS channel:
@@ -23,8 +23,8 @@ import '../utils/log.dart';
 
 /// Game server URLs — the dedicated subdomain is preferred; the path-based
 /// fallback on the main domain keeps working even before its DNS record exists.
-const String kLudoBaseUrl = 'https://ludo.unilive.me/';
-const String kLudoFallbackUrl = 'https://admin.unilive.me/ludo/';
+const String kLudoBaseUrl = 'https://ludo.iyolme.com/';
+const String kLudoFallbackUrl = 'https://mevoo.iyolme.com/ludo/';
 
 /// Lets the room screen signal the embedded game page — app lifecycle and
 /// panel minimise/restore live outside the WebView but must reach it so the

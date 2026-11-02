@@ -96,7 +96,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   /// Periodically check which chat partners are live (every 30s).
-  /// Mirrors native UnilivePro chat list which shows live badges.
+  /// Mirrors native SAFU LivePro chat list which shows live badges.
   void _startLiveCheckTimer() {
     _liveCheckTimer?.cancel();
     _liveCheckTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -283,7 +283,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   /// Join a chat partner's live stream directly from the chat list.
-  /// Mirrors native UnilivePro: tapping the LIVE badge on a chat row jumps
+  /// Mirrors native SAFU LivePro: tapping the LIVE badge on a chat row jumps
   /// straight into their live room.
   void _joinLiveFromChat(live_stream.LiveUser liveUser) {
     if (liveUser.isAudio) {

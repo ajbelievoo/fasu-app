@@ -1564,7 +1564,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   /// Ensure the host is always represented in [_seats] so volume/mute/wave
   /// updates can be applied even when the backend omits the host seat.
   /// The host sits at the top owner seat (position -1) by default so the
-  /// UnilivePro layout is preserved.
+  /// SAFU LivePro layout is preserved.
   void _ensureHostInSeats() {
     if (_hostOnCall) return; // host is away on a 1-on-1 call; keep seat empty.
     final session = context.read<SessionManager>();
@@ -6327,7 +6327,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
 
       // Trigger the entrance overlay for every joining user, not just VIPs.
       // VIPs get the full-screen special effect; regular users get a compact
-      // corner entry — matches native UnilivePro room joins.
+      // corner entry — matches native SAFU LivePro room joins.
       // Respects EffectSettings.showEnterRoomEffect (user can turn off).
       if (isJoined && _effectSettings.showEnterRoomEffect) {
         _vipEntryKey.currentState?.addEntry(
@@ -13300,7 +13300,7 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     try {
       final uri = Uri.parse(
-        'https://admin.unilive.me/ludo/api/status',
+        'https://mevoo.iyolme.com/ludo/api/status',
       ).replace(queryParameters: {'roomId': _liveId});
       final res = await (await client.getUrl(uri)).close();
       final body = await res.transform(utf8.decoder).join();

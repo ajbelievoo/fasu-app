@@ -290,7 +290,7 @@ class ApiClient {
   /// In production, replace the fingerprints with the actual server's.
   static void _attachCertificatePinning(Dio dio) {
     // Only pin for the main API server
-    if (!dio.options.baseUrl.contains('unilive.me')) return;
+    if (!dio.options.baseUrl.contains('safu.iyolme.com')) return;
 
     // Certificate pinning infrastructure — in production, use
     // dio_io_adapter + SecurityContext with SHA-256 fingerprints.

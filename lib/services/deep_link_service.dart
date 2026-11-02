@@ -16,7 +16,7 @@ import 'fcm_service.dart';
 /// Phase 6 implementation: uses `app_links` package to handle
 /// universal links. Deep link types: LIVE, USER, POST, REEL, REFERRAL.
 ///
-/// URL pattern: `https://admin.unilive.me/d/?type=LIVE&data=<json>`
+/// URL pattern: `https://mevoo.iyolme.com/d/?type=LIVE&data=<json>`
 class DeepLinkService {
   DeepLinkService._();
   static final DeepLinkService instance = DeepLinkService._();
@@ -52,7 +52,7 @@ class DeepLinkService {
     final type = uri.queryParameters['type'] ?? '';
     final data = uri.queryParameters['data'] ?? '';
 
-    // Referral landing links: https://admin.unilive.me/r/<CODE> — when the
+    // Referral landing links: https://mevoo.iyolme.com/r/<CODE> — when the
     // app is opened directly via a verified App Link the URI has no
     // type/data params, so read the code from the path. Saving the pending
     // code does not need the navigator, so this runs before the ctx check.
@@ -166,7 +166,7 @@ class DeepLinkService {
       if (hostName != null) 'title': 'Watch $hostName Live',
       if (hostImage != null) 'image': hostImage,
     };
-    final uri = Uri.parse('https://admin.unilive.me/d').replace(queryParameters: params);
+    final uri = Uri.parse('https://mevoo.iyolme.com/d').replace(queryParameters: params);
     return uri.toString();
   }
 
@@ -184,7 +184,7 @@ class DeepLinkService {
     if (refCode != null && refCode.isNotEmpty) {
       params['ref'] = refCode;
     }
-    final uri = Uri.parse('https://admin.unilive.me/d').replace(queryParameters: params);
+    final uri = Uri.parse('https://mevoo.iyolme.com/d').replace(queryParameters: params);
     return uri.toString();
   }
 
@@ -196,12 +196,12 @@ class DeepLinkService {
     final user = SessionManager.instance?.getUser();
     final refCode = user?.referralCode ?? '';
     if (refCode.isEmpty) return '';
-    return 'https://admin.unilive.me/r/$refCode';
+    return 'https://mevoo.iyolme.com/r/$refCode';
   }
 
   /// Generate a shareable deep link for a post.
   String generatePostShareLink({required String postId}) {
-    final uri = Uri.parse('https://admin.unilive.me/d').replace(queryParameters: {
+    final uri = Uri.parse('https://mevoo.iyolme.com/d').replace(queryParameters: {
       'type': 'POST',
       'data': postId,
     });
@@ -222,7 +222,7 @@ class DeepLinkService {
       'mode': isAudioCall ? 'audio' : 'video',
       'title': 'Call $name on Belive',
     };
-    final uri = Uri.parse('https://admin.unilive.me/d').replace(queryParameters: params);
+    final uri = Uri.parse('https://mevoo.iyolme.com/d').replace(queryParameters: params);
     return uri.toString();
   }
 

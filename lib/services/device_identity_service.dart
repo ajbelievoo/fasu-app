@@ -9,7 +9,7 @@ import 'session_manager.dart';
 /// Provides a stable, per-device identifier used by the backend to enforce
 /// device-level blocks (see `docs/FLUTTER_DEVICE_BLOCK_INTEGRATION.md`).
 ///
-/// Strategy (mirrors the native UnilivePro approach, hardened with a
+/// Strategy (mirrors the native SAFU LivePro approach, hardened with a
 /// persisted fallback):
 ///   1. Android  -> `androidInfo.id` (Android ID). iOS -> `iosInfo.identifierForVendor`.
 ///   2. The first

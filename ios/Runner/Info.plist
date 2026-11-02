@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>UniLive</string>
+	<string>SAFU Live</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>unilive</string>
+	<string>safu</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -37,7 +37,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Belive needs camera access to capture your live selfie and ID card for KYC verification. This is required to verify your identity and unlock withdrawals.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>UniLive needs microphone access for live audio rooms and calls.</string>
+	<string>SAFU Live needs microphone access for live audio rooms and calls.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Belive may save your KYC verification photos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

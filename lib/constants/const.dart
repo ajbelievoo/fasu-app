@@ -2,7 +2,7 @@ import 'api_key.dart';
 
 /// Application-wide constants for Belive.
 ///
-/// Ported from the native UnilivePro project (com.uni.live.video.Const).
+/// Ported from the native SAFU LivePro project (com.uni.live.video.Const).
 /// These keys are used by [SessionManager], [ApiService], socket events,
 /// and intent/route arguments. Keep them in sync with the backend.
 class Const {
@@ -20,13 +20,13 @@ class Const {
   /// Backend base URL. Matches BuildConfig.BASE_URL in the native app.
   static const String baseUrl = String.fromEnvironment(
     'BASE_URL',
-    defaultValue: 'https://admin.unilive.me/',
+    defaultValue: 'https://mevoo.iyolme.com/',
   );
 
   /// CDN base URL for media assets.
   static const String cdnUrl = String.fromEnvironment(
     'CDN_URL',
-    defaultValue: 'https://cdn.unilive.me/',
+    defaultValue: 'https://cdn.iyolme.com/',
   );
 
   /// IP lookup service (used during login to capture country/city).

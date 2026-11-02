@@ -237,7 +237,7 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: 28),
                     // Brand name.
                     const Text(
-                      'Unilive',
+                      'SAFU Live',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 40,

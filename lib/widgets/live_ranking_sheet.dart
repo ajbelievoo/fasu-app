@@ -2,7 +2,7 @@
 ///
 /// Shows the top gifters for the current host with a rich podium, "Top X Fan"
 /// badges, country flags, level badges and beans count. Ports the native
-/// ranking sheet used in UnilivePro/Chamet/Bigo live rooms.
+/// ranking sheet used in SAFU LivePro/Chamet/Bigo live rooms.
 library live_ranking_sheet;
 
 import 'package:cached_network_image/cached_network_image.dart';

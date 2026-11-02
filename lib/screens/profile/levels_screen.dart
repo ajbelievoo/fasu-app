@@ -234,7 +234,7 @@ class _LevelsScreenState extends State<LevelsScreen>
 
   /// Cumulative progress metric for level progression.
   ///
-  /// Matches the native UnilivePro app: user levels progress on **total
+  /// Matches the native SAFU LivePro app: user levels progress on **total
   /// diamonds spent** (`user.spentCoin`) and host levels on **total earned**
   /// (`user.earnCoin`) — NOT on the current balance. Using the balance caused
   /// the in-progress level's progress bar to appear empty whenever the user

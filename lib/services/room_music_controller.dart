@@ -5,7 +5,7 @@
 /// play locally — they hear the mix through the stream and only mirror the
 /// playback state for UI (synced via socket events).
 ///
-/// Ports the native `PopupBuilder.playMusicPopup` flow from UnilivePro (which
+/// Ports the native `PopupBuilder.playMusicPopup` flow from SAFU LivePro (which
 /// was a stub there) into a proper player with: play / pause / resume / stop /
 /// seek / volume / next / previous / auto-advance queue / position + duration.
 library room_music_controller;

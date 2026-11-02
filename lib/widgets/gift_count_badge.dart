@@ -1,6 +1,6 @@
 /// Styled gift count badge — ports native `getImageFromNumber(count)`.
 ///
-/// Native UnilivePro uses pre-made styled `.webp` images (x1, x10, x21, x33,
+/// Native SAFU LivePro uses pre-made styled `.webp` images (x1, x10, x21, x33,
 /// x44, x55, x66, x7, x77, x88, x99) for the gift count display. Since those
 /// assets are empty placeholders in the source repo, we render an equivalent
 /// styled badge programmatically: a gold gradient pill with "xN" text,

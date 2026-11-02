@@ -7,7 +7,7 @@ import 'session_manager.dart';
 
 /// Reads the Google Play Install Referrer once per install.
 ///
-/// Referral install links (`https://admin.unilive.me/r/<CODE>`) redirect
+/// Referral install links (`https://mevoo.iyolme.com/r/<CODE>`) redirect
 /// non-installed users to the Play Store with `referrer=referral_code%3D<CODE>`.
 /// On first launch after install, Play hands that string back here; we stash
 /// the code as the pending referral so loginSignup can credit the referrer.

@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <application
-        android:label="Unilive"
+        android:label="SAFU Live"
         android:name="${applicationName}"
         android:extractNativeLibs="true"
         android:enableOnBackInvokedCallback="true"
@@ -57,8 +57,8 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:host="admin.unilive.me" android:scheme="https" android:pathPrefix="/d"/>
-                <data android:host="admin.unilive.me" android:scheme="https" android:pathPrefix="/r"/>
+                <data android:host="mevoo.iyolme.com" android:scheme="https" android:pathPrefix="/d"/>
+                <data android:host="mevoo.iyolme.com" android:scheme="https" android:pathPrefix="/r"/>
             </intent-filter>
         </activity>
         <!-- FCM duplicate-push suppressor: runs at max priority on the c2dm

@@ -1,6 +1,6 @@
 /// Models for the in-room music player.
 ///
-/// Ports the native `AudioDetails` model from UnilivePro and adds the fields
+/// Ports the native `AudioDetails` model from SAFU LivePro and adds the fields
 /// needed by the unified [RoomMusicController] / [RoomMusicBar].
 library room_music_models;
 

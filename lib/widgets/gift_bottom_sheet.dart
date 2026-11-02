@@ -522,7 +522,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
   /// Returns the best animation URL (SVGA or video) for a gift.
   ///
   /// The backend may store the animation URL in EITHER `svgaImage` OR `image`.
-  /// Native UnilivePro often puts the SVGA path in the `image` field. If we
+  /// Native SAFU LivePro often puts the SVGA path in the `image` field. If we
   /// only check `svgaImage`, the animation URL is lost and the overlay shows
   /// a static image instead of playing.
   ///
@@ -538,7 +538,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
         return VideoUtil.getFullImageUrl(gift.svgaImage);
       }
     }
-    // 2. Check image field — native UnilivePro often stores the SVGA path here.
+    // 2. Check image field — native SAFU LivePro often stores the SVGA path here.
     if ((gift.image ?? '').isNotEmpty) {
       if (_isSvgaGift(gift.image)) {
         return VideoUtil.getFullSvgaUrl(gift.image);
@@ -830,7 +830,7 @@ class _GiftBottomSheetState extends State<GiftBottomSheet> {
         // backend-provided static image field.
         giftImage: _bestStaticImageUrl(_selectedGift!),
         // Use _bestAnimationUrl — the animation URL may be in EITHER
-        // svgaImage OR image field (native UnilivePro often stores the
+        // svgaImage OR image field (native SAFU LivePro often stores the
         // SVGA path in `image`). Without this, the overlay gets an empty
         // svgaImage and falls back to a static image (no animation plays).
         svgaImage: _bestAnimationUrl(_selectedGift!),

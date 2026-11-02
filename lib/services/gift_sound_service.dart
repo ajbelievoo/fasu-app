@@ -1,6 +1,6 @@
 /// Gift sound effect service.
 ///
-/// Provides two sound layers for gifts (matching native UnilivePro behaviour):
+/// Provides two sound layers for gifts (matching native SAFU LivePro behaviour):
 ///
 /// 1. **Default gift sound** — a short coin/chime (`assets/sounds/gift.wav`)
 ///    played on every gift send & receive. Native SVGA gifts carry their own

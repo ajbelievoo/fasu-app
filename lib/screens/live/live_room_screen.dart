@@ -535,7 +535,7 @@ class LiveRoomScreen extends StatefulWidget {
   /// True when the viewer joined from a chat conversation (tapped the LIVE
   /// badge in chat list or the live banner in chat screen). The room shows a
   /// brief "Joined from chat" highlight banner so the user knows how they got
-  /// here — mirrors native UnilivePro behaviour.
+  /// here — mirrors native SAFU LivePro behaviour.
   final bool fromChat;
 
   @override
@@ -576,7 +576,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   bool _hostOffline = false;
 
   /// "Joined from chat" highlight banner — shown for ~4s on entry when the
-  /// viewer came from a chat conversation. Mirrors native UnilivePro.
+  /// viewer came from a chat conversation. Mirrors native SAFU LivePro.
   bool _showFromChatBanner = false;
   Timer? _fromChatBannerTimer;
 
@@ -2207,7 +2207,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
         Log.w(_tag, 'clear_vision extension not available: $e');
       }
 
-      // Match native UnilivePro encoder config: fixed portrait orientation.
+      // Match native SAFU LivePro encoder config: fixed portrait orientation.
       await _engine.setVideoEncoderConfiguration(_getVideoConfig());
 
       // Apply beauty settings selected on Go Live screen.
@@ -3484,7 +3484,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
           }
           // Entry animation for EVERY joining user — VIPs get the special
           // entrance, regular users get the compact corner entry (mirrors
-          // audio room + native UnilivePro). Host also sees entries.
+          // audio room + native SAFU LivePro). Host also sees entries.
           if (_effectSettings.showEnterRoomEffect) {
             _vipEntryKey.currentState?.addEntry(
               VipEntryData.fromSocketJson(map),
@@ -12334,7 +12334,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
       child: Scaffold(
         // Keep the video/background Stack fixed in place when the keyboard opens.
         // Only the bottom bar (chat input) and comments overlay lift above the keyboard,
-        // so the live screen does not shrink/shift. Matches native UnilivePro behavior.
+        // so the live screen does not shrink/shift. Matches native SAFU LivePro behavior.
         resizeToAvoidBottomInset: false,
         backgroundColor: Colors.black,
         body:
@@ -12551,7 +12551,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   }
 
   /// Highlight banner shown briefly when the viewer joined from a chat
-  /// conversation. Mirrors native UnilivePro: lets the user know they came
+  /// conversation. Mirrors native SAFU LivePro: lets the user know they came
   /// from a chat message and the host can see "joined from chat".
   Widget _buildFromChatBanner() {
     return Positioned(
@@ -12738,7 +12738,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   Widget _buildCoHostGrid() {
     if (_coHosts.isEmpty && _coHostControllers.isEmpty)
       return const SizedBox.shrink();
-    // UnilivePro-style right-side co-host strip: small vertical boxes on the
+    // SAFU LivePro-style right-side co-host strip: small vertical boxes on the
     // right so the host video stays large and no guest ever covers the whole
     // screen (fixes the large overlay issue).
     final topPad = MediaQuery.of(context).viewPadding.top;
@@ -14083,7 +14083,7 @@ class _LiveRoomScreenState extends State<LiveRoomScreen>
   }
 
   /// Inline PK overlay — renders split-screen PK inside the live room,
-  /// matching native UniLivePro's in-place PK composition. Comments, gifts,
+  /// matching native SAFU LivePro's in-place PK composition. Comments, gifts,
   /// bottom bar, and all live-room functionality continue working.
   /// PK overlay scale — phones smaller than the 390dp design width get
   /// proportionally smaller chrome so videos/buttons fit small screens.

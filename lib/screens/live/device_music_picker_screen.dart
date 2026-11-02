@@ -1,4 +1,4 @@
-/// Device music picker — ports UnilivePro's `MusicFolderActivity` +
+/// Device music picker — ports SAFU LivePro's `MusicFolderActivity` +
 /// `AudioListActivity`.
 ///
 /// Two screens:

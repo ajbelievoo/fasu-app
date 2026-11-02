@@ -1,4 +1,4 @@
-/// Mobile login screen — UnilivePro style with video background.
+/// Mobile login screen — SAFU LivePro style with video background.
 ///
 /// Two-step flow:
 /// 1. User enters country code + mobile number, taps "Get OTP".
@@ -152,7 +152,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen>
     final session = context.read<SessionManager>();
     var id = session.getString('device_identity');
     if (id.isEmpty) {
-      id = 'unilive-${DateTime.now().millisecondsSinceEpoch}';
+      id = 'safu-${DateTime.now().millisecondsSinceEpoch}';
       session.saveString('device_identity', id);
     }
     return id;
