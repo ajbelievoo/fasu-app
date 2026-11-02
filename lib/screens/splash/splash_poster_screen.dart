@@ -101,7 +101,7 @@ class _SplashPosterScreenState extends State<SplashPosterScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
-                    'assets/images/unilive_logo.png',
+                    'assets/images/safu_logo.png',
                     width: 100,
                     height: 100,
                   ),
@@ -126,7 +126,7 @@ class _SplashPosterScreenState extends State<SplashPosterScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Image.asset(
-                            'assets/images/unilive_logo.png',
+                            'assets/images/safu_logo.png',
                             width: 100,
                             height: 100,
                           ),
@@ -142,7 +142,7 @@ class _SplashPosterScreenState extends State<SplashPosterScreen> {
                   );
                   return Center(
                     child: Image.asset(
-                      'assets/images/unilive_logo.png',
+                      'assets/images/safu_logo.png',
                       width: 100,
                       height: 100,
                     ),
@@ -153,7 +153,7 @@ class _SplashPosterScreenState extends State<SplashPosterScreen> {
           else
             Center(
               child: Image.asset(
-                'assets/images/unilive_logo.png',
+                'assets/images/safu_logo.png',
                 width: 100,
                 height: 100,
               ),

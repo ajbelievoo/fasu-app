@@ -474,7 +474,7 @@ class _MobileLoginScreenState extends State<MobileLoginScreen>
                             ],
                           ),
                           padding: const EdgeInsets.all(8),
-                          child: Image.asset('assets/images/unilive_logo.png'),
+                          child: Image.asset('assets/images/safu_logo.png'),
                         ),
                         const SizedBox(height: 16),
                         const Text(

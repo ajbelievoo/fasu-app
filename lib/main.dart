@@ -316,7 +316,7 @@ class _BeliveAppState extends State<_BeliveApp> with WidgetsBindingObserver {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Image.asset(
-                      'assets/images/unilive_logo.png',
+                      'assets/images/safu_logo.png',
                       width: 96,
                       height: 96,
                     ),

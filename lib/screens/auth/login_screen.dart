@@ -608,7 +608,7 @@ class _LoginScreenState extends State<LoginScreen>
               ],
             ),
             padding: const EdgeInsets.all(10),
-            child: Image.asset('assets/images/unilive_logo.png'),
+            child: Image.asset('assets/images/safu_logo.png'),
           ),
         );
       },
