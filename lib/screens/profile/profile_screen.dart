@@ -1123,6 +1123,19 @@ class _WalletSection extends StatelessWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _walletMiniCard(
+                    icon: Icons.storefront_rounded,
+                    label: 'My Items',
+                    subLabel: 'STORE',
+                    onTap: () => context.pushNamed(AppRoutes.myStore),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
