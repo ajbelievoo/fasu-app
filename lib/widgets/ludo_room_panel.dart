@@ -1,4 +1,4 @@
-/// In-room Ludo panel — embeds the Ludo web game (ludo.iyolme.com) inside the
+/// In-room Ludo panel — embeds the Ludo web game (ludo.believoo.com) inside the
 /// audio room so seated players can play without leaving the room.
 ///
 /// The web page talks to the app through the `GameBridge` JS channel:
@@ -23,7 +23,7 @@ import '../utils/log.dart';
 
 /// Game server URLs — the dedicated subdomain is preferred; the path-based
 /// fallback on the main domain keeps working even before its DNS record exists.
-const String kLudoBaseUrl = 'https://ludo.iyolme.com/';
+const String kLudoBaseUrl = 'https://ludo.believoo.com/';
 const String kLudoFallbackUrl = 'https://mevoo.iyolme.com/ludo/';
 
 /// Lets the room screen signal the embedded game page — app lifecycle and
@@ -39,8 +39,7 @@ class LudoRoomPanelController {
   void notifyRoomEnd() => _state?.notifyRoomEnd();
 
   /// Push the room's muted-seat user ids so board avatars show a mic badge.
-  void setMicMuted(List<String> userIds) =>
-      _state?.setMicMuted(userIds);
+  void setMicMuted(List<String> userIds) => _state?.setMicMuted(userIds);
 }
 
 class LudoRoomPanel extends StatefulWidget {
@@ -169,10 +168,11 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
                 if (e.isForMainFrame != true || !mounted) return;
                 // Domain not resolving yet? Retry once on the fallback path.
                 if (!_useFallback &&
-                    (e.errorCode == -2 ||
-                        e.description.contains('ERR_NAME'))) {
+                    (e.errorCode == -2 || e.description.contains('ERR_NAME'))) {
                   _useFallback = true;
-                  _controller.loadRequest(Uri.parse(_buildUrl(kLudoFallbackUrl)));
+                  _controller.loadRequest(
+                    Uri.parse(_buildUrl(kLudoFallbackUrl)),
+                  );
                   return;
                 }
                 setState(() {
