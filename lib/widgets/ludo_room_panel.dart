@@ -23,8 +23,14 @@ import '../utils/log.dart';
 
 /// Game server URLs — the dedicated subdomain is preferred; the path-based
 /// fallback on the main domain keeps working even before its DNS record exists.
-const String kLudoBaseUrl = 'https://ludo.believoo.com/';
-const String kLudoFallbackUrl = 'https://mevoo.iyolme.com/ludo/';
+const String kLudoBaseUrl = String.fromEnvironment(
+  'LUDO_URL',
+  defaultValue: 'https://ludo.believoo.com/',
+);
+const String kLudoFallbackUrl = String.fromEnvironment(
+  'LUDO_FALLBACK_URL',
+  defaultValue: 'https://mevoo.iyolme.com/ludo/',
+);
 
 /// Lets the room screen signal the embedded game page — app lifecycle and
 /// panel minimise/restore live outside the WebView but must reach it so the
