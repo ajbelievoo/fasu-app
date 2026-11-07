@@ -21,15 +21,22 @@ import '../services/session_manager.dart';
 import '../services/socket_service.dart';
 import '../utils/log.dart';
 
-/// Game server URLs — the dedicated subdomain is preferred; the path-based
-/// fallback on the main domain keeps working even before its DNS record exists.
+/// Game server URLs — the licensed B-MALL deployment (Ludo Plus) is the
+/// primary; the path-based fallback on the main domain keeps working even if
+/// its DNS record fails.
 const String kLudoBaseUrl = String.fromEnvironment(
   'LUDO_URL',
-  defaultValue: 'https://ludo.believoo.com/',
+  defaultValue: 'https://ludoplus.iyolme.com/pg/live',
 );
 const String kLudoFallbackUrl = String.fromEnvironment(
   'LUDO_FALLBACK_URL',
   defaultValue: 'https://mevoo.iyolme.com/ludo/',
+);
+
+/// Where the Play tab / random-join fetch the live Ludo room list from.
+const String kLudoRoomsUrl = String.fromEnvironment(
+  'LUDO_ROOMS_URL',
+  defaultValue: 'https://ludoplus.iyolme.com/rooms',
 );
 
 /// Lets the room screen signal the embedded game page — app lifecycle and
@@ -46,6 +53,10 @@ class LudoRoomPanelController {
 
   /// Push the room's muted-seat user ids so board avatars show a mic badge.
   void setMicMuted(List<String> userIds) => _state?.setMicMuted(userIds);
+
+  /// Ask the game to seat the local user at [seat] (-1 = first free). Used
+  /// when an invite is accepted while the panel is already mounted.
+  void sitAt(int seat) => _state?.sitAt(seat);
 }
 
 class LudoRoomPanel extends StatefulWidget {
@@ -56,6 +67,8 @@ class LudoRoomPanel extends StatefulWidget {
     this.onMinimize,
     this.canHost = false,
     this.controller,
+    this.sitParam,
+    this.onInviteSeat,
   });
 
   /// Optional handle the screen uses to forward minimise/lifecycle signals.
@@ -75,6 +88,14 @@ class LudoRoomPanel extends StatefulWidget {
   /// (mid-round the web client can't fully close).
   final VoidCallback? onMinimize;
 
+  /// Optional `?sit=` value merged into the game URL — 'auto' for the first
+  /// free seat (random-join) or a seat number (invite accept).
+  final String? sitParam;
+
+  /// A seated player tapped an empty board seat — the host app should offer
+  /// its mic-seat member list so someone can be invited into that seat.
+  final void Function(int seat)? onInviteSeat;
+
   @override
   State<LudoRoomPanel> createState() => LudoRoomPanelState();
 }
@@ -85,6 +106,7 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
   bool _loading = true;
   bool _useFallback = false;
   String? _loadError;
+  int? _pendingSit;
 
   String _buildUrl(String base) {
     final session = SessionManager.instance;
@@ -99,6 +121,8 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
       'token': user?.token ?? '',
       'diamond': '${user?.coin.toInt() ?? 0}',
       if (widget.canHost) 'host': '1',
+      if (widget.sitParam != null && widget.sitParam!.isNotEmpty)
+        'sit': widget.sitParam!,
     };
     return uri.replace(queryParameters: params).toString();
   }
@@ -127,6 +151,21 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
     _controller.runJavaScript('window.ludoMic && window.ludoMic([$list])');
   }
 
+  /// Seat the local user at [seat] (-1 = first free) — invite-accept path
+  /// when the panel is already mounted. If the page is still loading the
+  /// request is retried once the page finishes.
+  void sitAt(int seat) {
+    _pendingSit = seat;
+    _flushPendingSit();
+  }
+
+  void _flushPendingSit() {
+    final seat = _pendingSit;
+    if (seat == null || _loading) return;
+    _pendingSit = null;
+    _controller.runJavaScript('window.ludoSit && window.ludoSit($seat)');
+  }
+
   void _onGameMessage(String message) {
     if (message == 'close') {
       widget.onClose?.call();
@@ -145,6 +184,11 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
       if (uid.isNotEmpty) {
         SocketService.instance.emit(Const.eventUserCoinUpdate, uid);
       }
+      return;
+    }
+    if (message.startsWith('invite:')) {
+      final seat = int.tryParse(message.substring(7)) ?? -1;
+      widget.onInviteSeat?.call(seat);
       return;
     }
     if (message.startsWith('toast:')) {
@@ -169,6 +213,7 @@ class LudoRoomPanelState extends State<LudoRoomPanel> {
             NavigationDelegate(
               onPageFinished: (_) {
                 if (mounted) setState(() => _loading = false);
+                _flushPendingSit();
               },
               onWebResourceError: (e) {
                 if (e.isForMainFrame != true || !mounted) return;

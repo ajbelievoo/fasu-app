@@ -490,6 +490,7 @@ class AppRoutes {
           roomUser: roomUser,
           isHost: extra['isHost'] as bool? ?? false,
           fromChat: extra['fromChat'] as bool? ?? false,
+          ludoAutoSit: extra['ludoAutoSit'] as bool? ?? false,
         );
       }),
       // Export AudioRoomUser from audio_room_screen.dart

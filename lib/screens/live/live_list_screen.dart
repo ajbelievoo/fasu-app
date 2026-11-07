@@ -7,6 +7,7 @@ library live_list;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:country_picker/country_picker.dart';
@@ -35,6 +36,7 @@ import '../call/call_screen.dart' show startCall;
 import '../../providers/notification_provider.dart';
 import 'live_preview_pager.dart';
 import 'package:belive/widgets/preloader.dart';
+import '../../widgets/ludo_room_panel.dart' show kLudoRoomsUrl;
 
 class LiveListScreen extends StatefulWidget {
   const LiveListScreen({super.key});
@@ -61,7 +63,7 @@ class LiveListScreenState extends State<LiveListScreen>
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 6, vsync: this);
+    _tab = TabController(length: 7, vsync: this);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -158,6 +160,7 @@ class LiveListScreenState extends State<LiveListScreen>
                         Tab(text: 'PK'),
                         Tab(text: 'Video Call'),
                         Tab(text: 'Following'),
+                        Tab(text: 'Play'),
                       ],
                     ),
                   ),
@@ -255,6 +258,7 @@ class LiveListScreenState extends State<LiveListScreen>
                   const _DiscoveryTab(variant: _DiscoveryVariant.pk),
                   const _VideoCallTab(),
                   const _DiscoveryTab(variant: _DiscoveryVariant.following),
+                  const _PlayTab(),
                 ],
               ),
             ),
@@ -2237,5 +2241,331 @@ class _PillTabIndicatorPainter extends BoxPainter {
     final paint = Paint()..color = color;
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(radius));
     canvas.drawRRect(rrect, paint);
+  }
+}
+
+/// Play tab — lists the room-games enabled by the license admin
+/// (`/rooms` on the game server returns enabled:false when the operator
+/// turns the Play tab off). Each enabled game card opens its live-room
+/// list; the floating 🔀 button jumps into a room whose host is looking
+/// for random players and seats the user automatically.
+class _PlayTab extends StatefulWidget {
+  const _PlayTab();
+
+  @override
+  State<_PlayTab> createState() => _PlayTabState();
+}
+
+class _PlayTabState extends State<_PlayTab>
+    with AutomaticKeepAliveClientMixin {
+  bool _loading = true;
+  bool _enabled = true;
+  String _brand = 'Ludo';
+  List<Map<String, dynamic>> _rooms = const [];
+  bool _joining = false;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final client =
+          HttpClient()..connectionTimeout = const Duration(seconds: 6);
+      try {
+        final req = await client.getUrl(Uri.parse(kLudoRoomsUrl));
+        final res = await req.close();
+        final body = await res.transform(utf8.decoder).join();
+        final map = jsonDecode(body) as Map<String, dynamic>;
+        if (!mounted) return;
+        setState(() {
+          _enabled = map['enabled'] == true;
+          _brand = map['brand']?.toString() ?? 'Ludo';
+          _rooms =
+              (map['rooms'] as List? ?? const [])
+                  .whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList();
+          _loading = false;
+        });
+      } finally {
+        client.close();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Resolve a Ludo table id (the room's liveStreamingId) into a joinable
+  /// audio room, then push the room screen.
+  Future<void> _joinRoom(String liveId, {bool autoSit = false}) async {
+    if (_joining || liveId.isEmpty) return;
+    _joining = true;
+    try {
+      final res = await ApiService.getLiveStream(liveId);
+      final live = res.user;
+      if (!mounted) return;
+      if (live == null) {
+        Fluttertoast.showToast(msg: 'Room is no longer live');
+        return;
+      }
+      context.pushNamed(
+        AppRoutes.audioRoom,
+        extra: {
+          'roomUser': AudioRoomUser.fromLiveStream(live),
+          'isHost': false,
+          'ludoAutoSit': autoSit,
+        },
+      );
+    } catch (_) {
+      if (mounted) {
+        Fluttertoast.showToast(msg: 'Could not open the room');
+      }
+    } finally {
+      _joining = false;
+    }
+  }
+
+  /// Random join — first room whose host flagged "looking for random
+  /// players" with a free Ludo seat.
+  Future<void> _joinRandom() async {
+    final match = _rooms.firstWhere(
+      (r) => r['wantRandom'] == true && (r['seatsFree'] as num? ?? 0) > 0,
+      orElse: () => const <String, dynamic>{},
+    );
+    final room = match['room']?.toString() ?? '';
+    if (room.isEmpty) {
+      Fluttertoast.showToast(
+        msg: 'No hosts looking for random players right now',
+      );
+      return;
+    }
+    await _joinRoom(room, autoSit: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (!_enabled && !_loading) {
+      return const Center(
+        child: Text(
+          'No games enabled right now',
+          style: TextStyle(color: Colors.white54),
+        ),
+      );
+    }
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'ludoRandomJoin',
+        backgroundColor: const Color(0xFF7A2FF2),
+        onPressed: _joinRandom,
+        child: const Text('🔀', style: TextStyle(fontSize: 22)),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 90),
+          children: [
+            // Game card — only games the admin enabled are listed.
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF5B3AA8), Color(0xFF37235F)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A1B52),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('🎲', style: TextStyle(fontSize: 26)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _brand,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _loading
+                              ? 'Loading rooms…'
+                              : '${_rooms.length} table(s) live',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white54,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.only(top: 30),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_rooms.isEmpty)
+              const Padding(
+                padding: EdgeInsets.only(top: 30),
+                child: Center(
+                  child: Text(
+                    'No Ludo rooms open right now\nPull to refresh',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54, height: 1.4),
+                  ),
+                ),
+              )
+            else
+              ..._rooms.map(_roomTile),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _roomTile(Map<String, dynamic> r) {
+    final room = r['room']?.toString() ?? '';
+    final phase = r['phase']?.toString() ?? 'lobby';
+    final mode = r['mode']?.toString() ?? 'classic';
+    final seatsFree = (r['seatsFree'] as num? ?? 0).toInt();
+    final wantRandom = r['wantRandom'] == true;
+    final players =
+        (r['players'] as List? ?? const [])
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+    final playing = phase == 'playing';
+    return GestureDetector(
+      onTap: () => _joinRoom(room),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF241847),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        child: Row(
+          children: [
+            // Player avatar stack
+            SizedBox(
+              width: 64,
+              height: 40,
+              child: Stack(
+                children: [
+                  for (var i = 0; i < players.length && i < 3; i++)
+                    Positioned(
+                      left: i * 18.0,
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: const Color(0xFF37235F),
+                        backgroundImage:
+                            (players[i]['image']?.toString() ?? '').isNotEmpty
+                                ? CachedNetworkImageProvider(
+                                  players[i]['image'].toString(),
+                                )
+                                : null,
+                        child:
+                            (players[i]['image']?.toString() ?? '').isEmpty
+                                ? const Icon(
+                                  Icons.person,
+                                  size: 16,
+                                  color: Colors.white54,
+                                )
+                                : null,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              playing
+                                  ? const Color(0xFFE33B3B)
+                                  : const Color(0xFF2E9E5B),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          playing ? 'PLAYING' : 'LOBBY',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (wantRandom) ...[
+                        const SizedBox(width: 6),
+                        const Text('🔀', style: TextStyle(fontSize: 12)),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${players.map((p) => p['name'] ?? '?').join(', ')}'
+                    .replaceAll(RegExp(r'^,\s*'), ''),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$mode • ${4 - seatsFree}/4 seats'
+                    '${seatsFree > 0 ? ' • $seatsFree open' : ''}',
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white38),
+          ],
+        ),
+      ),
+    );
   }
 }

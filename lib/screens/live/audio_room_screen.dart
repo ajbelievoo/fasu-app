@@ -563,6 +563,7 @@ class AudioRoomScreen extends StatefulWidget {
     required this.roomUser,
     required this.isHost,
     this.fromChat = false,
+    this.ludoAutoSit = false,
   });
 
   final AudioRoomUser roomUser;
@@ -571,6 +572,10 @@ class AudioRoomScreen extends StatefulWidget {
   /// True when the viewer joined from a chat conversation (tapped the LIVE
   /// badge in chat list or the live banner in chat screen).
   final bool fromChat;
+
+  /// True when the viewer came from the Play tab's random-join button — the
+  /// game panel should open and take the first free Ludo seat on its own.
+  final bool ludoAutoSit;
 
   @override
   State<AudioRoomScreen> createState() => _AudioRoomScreenState();
@@ -704,6 +709,10 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
   bool _ludoMinimized =
       false; // mid-round the web view only minimises — socket stays alive
   final LudoRoomPanelController _ludoCtrl = LudoRoomPanelController();
+
+  /// `?sit=` value merged into the Ludo URL when the panel (re)builds —
+  /// 'auto' for random-join, a seat number after accepting a seat invite.
+  String? _ludoSitParam;
   bool _isTranslationEnabled = false;
 
   /// Push muted-seat user ids into the Ludo web page so board avatars can
@@ -5026,6 +5035,9 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
       } catch (_) {}
     });
 
+    // Random-join from the Play tab — auto-open the panel and take the
+    // first free Ludo seat once the table appears.
+    if (widget.ludoAutoSit) _ludoSitParam = 'auto';
     _checkLudoActive();
 
     // In-room Ludo table state — the game server relays ludoTable events
@@ -5047,6 +5059,19 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
               () => _pushComment(
                 _LiveComment(name: '🎲 Ludo', text: c, isSystem: true),
               ),
+            );
+          }
+          return;
+        }
+        if (action == 'invite') {
+          // A seated player picked this user from the room's seat list to
+          // take a Ludo seat — show an accept sheet targeting only them.
+          final target = map['targetId']?.toString() ?? '';
+          final me = SessionManager.instance?.getUser()?.id ?? '';
+          if (target.isNotEmpty && target == me) {
+            _showLudoInvite(
+              seat: int.tryParse(map['seat']?.toString() ?? '') ?? -1,
+              fromName: map['fromName']?.toString() ?? 'A player',
             );
           }
           return;
@@ -13335,6 +13360,143 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
     });
   }
 
+  /// A seated player tapped an empty Ludo seat — offer the room's occupied
+  /// mic seats so someone can be invited into that game seat.
+  void _onLudoInviteSeat(int seat) {
+    final me = SessionManager.instance?.getUser();
+    final candidates =
+        _seats
+            .where((s) => (s.userId ?? '').isNotEmpty && s.userId != me?.id)
+            .toList();
+    if (candidates.isEmpty) {
+      Fluttertoast.showToast(msg: 'No one on the room seats to invite');
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF241847),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Text(
+                  'Invite to Ludo',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              ...candidates.map(
+                (s) => ListTile(
+                  leading: CircleAvatar(
+                    radius: 18,
+                    backgroundImage:
+                        (s.image ?? '').isNotEmpty
+                            ? SafeImageProvider(s.image!)
+                            : null,
+                    child:
+                        (s.image ?? '').isEmpty
+                            ? const Icon(Icons.person, size: 18)
+                            : null,
+                  ),
+                  title: Text(
+                    s.name ?? 'User',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    'Seat ${s.position + 1}',
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                  trailing: const Icon(
+                    Icons.sports_esports,
+                    color: Color(0xFFFFD54F),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    SocketService.instance.emit('ludoTable', {
+                      'liveStreamingId': _liveId,
+                      'action': 'invite',
+                      'seat': seat,
+                      'targetId': s.userId,
+                      'targetName': s.name ?? 'User',
+                      'fromId': me?.id ?? '',
+                      'fromName': me?.name ?? 'A player',
+                    });
+                    _pushComment(
+                      _LiveComment(
+                        name: '🎲 Ludo',
+                        text:
+                            '${me?.name ?? 'Host'} invited ${s.name ?? 'a player'} to play',
+                        isSystem: true,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Incoming Ludo seat invite — accept opens the panel and sits at [seat].
+  void _showLudoInvite({required int seat, required String fromName}) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF241847),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              '🎲 Ludo invite',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              '$fromName invited you to take a seat at the Ludo table.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Later'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7A2FF2),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _ludoSitParam = '$seat';
+                    _ludoPanelVisible = true;
+                    _ludoDismissed = false;
+                    _ludoMinimized = false;
+                  });
+                  // Panel already mounted? Take the seat straight away —
+                  // otherwise the ?sit= URL param does it on load.
+                  _ludoCtrl.sitAt(seat);
+                },
+                child: const Text('Play'),
+              ),
+            ],
+          ),
+    );
+  }
+
   Widget _buildLudoPanel() {
     if (!_ludoPanelVisible || _liveId.isEmpty) {
       return const SizedBox.shrink();
@@ -13410,6 +13572,8 @@ class _AudioRoomScreenState extends State<AudioRoomScreen>
             roomId: _liveId,
             canHost: _amHost || _iAmAdmin,
             controller: _ludoCtrl,
+            sitParam: _ludoSitParam,
+            onInviteSeat: _onLudoInviteSeat,
             onMinimize: () {
               if (!mounted) return;
               setState(() => _ludoMinimized = true);
