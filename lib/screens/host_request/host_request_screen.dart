@@ -48,6 +48,10 @@ class _HostRequestScreenState extends State<HostRequestScreen> {
     final user = session.getUser();
     _nameCtrl.text = user?.username ?? '';
     _bioCtrl.text = user?.bio ?? '';
+    // Prefill the agency code for users who already joined an agency.
+    _agencyCtrl.text = user?.agencyCode ?? '';
+    // Rebuild when the agency field changes so the Join button hides/shows.
+    _agencyCtrl.addListener(() => setState(() {}));
     if (session.userId.isNotEmpty && session.hostRequestSubmitted) {
       _isRedirecting = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -64,6 +68,22 @@ class _HostRequestScreenState extends State<HostRequestScreen> {
     _agencyCtrl.dispose();
     _bankCtrl.dispose();
     super.dispose();
+  }
+
+  /// Push the agency list (returnTo mode). When the user joins an agency it
+  /// pops back true; we then prefill the agency code from the session user.
+  Future<void> _openJoinAgency() async {
+    final joined = await context.pushNamed<bool>(
+      AppRoutes.agencyList,
+      extra: AppRoutes.hostRequest,
+    );
+    if (joined == true && mounted) {
+      final user = context.read<SessionManager>().getUser();
+      final code = user?.agencyCode ?? '';
+      if (code.isNotEmpty) {
+        setState(() => _agencyCtrl.text = code);
+      }
+    }
   }
 
   Future<void> _pickImage() async {
@@ -200,6 +220,22 @@ class _HostRequestScreenState extends State<HostRequestScreen> {
               _buildField(_bioCtrl, 'Bio', Icons.description, maxLines: 3),
               const SizedBox(height: 12),
               _buildField(_agencyCtrl, 'Agency Code (optional)', Icons.business),
+              // Join-agency shortcut — shown when the user hasn't joined an
+              // agency yet. Takes them to the agency list; after joining it
+              // pops back here and the code prefills automatically.
+              if (_agencyCtrl.text.trim().isEmpty) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _openJoinAgency,
+                  icon: const Icon(Icons.group_add, size: 20),
+                  label: const Text('Join Agency'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.primary,
+                    side: BorderSide(
+                        color: AppTheme.primary.withValues(alpha: 0.5)),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               _buildField(_bankCtrl, 'Bank Details', Icons.account_balance,
                   maxLines: 2),

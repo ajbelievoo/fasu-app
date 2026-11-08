@@ -1,6 +1,8 @@
-/// Agency list screen â€” shows all agencies from `/agency`.
+/// Agency list screen — shows all agencies from `/agency`.
 ///
-/// Users can browse agencies, view details, and join.
+/// Users can browse agencies, view details, and join. After a successful
+/// join a welcome card shows the agency name + code; when opened with
+/// [returnTo] the screen pops back to the caller so it can continue.
 library agency_list;
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -16,7 +18,10 @@ import '../../utils/log.dart';
 import 'package:belive/widgets/preloader.dart';
 
 class AgencyListScreen extends StatefulWidget {
-  const AgencyListScreen({super.key});
+  const AgencyListScreen({super.key, this.returnTo});
+
+  /// Route name to pop back to after a successful join (e.g. hostRequest).
+  final String? returnTo;
 
   @override
   State<AgencyListScreen> createState() => _AgencyListScreenState();
@@ -59,11 +64,30 @@ class _AgencyListScreenState extends State<AgencyListScreen> {
         userId: session.userId,
         agencyId: agency.id ?? '',
       );
-      if (res.status) {
-        Fluttertoast.showToast(msg: 'Joined agency');
-        _loadAgencies();
-      } else {
+      if (!res.status) {
         Fluttertoast.showToast(msg: res.message ?? 'Failed to join');
+        return;
+      }
+
+      // Update the cached session user with the joined agency so the host
+      // request form can prefill the agency code.
+      final joined = res.data?['agency'] as Map<String, dynamic>?;
+      final name = joined?['name']?.toString() ?? agency.name ?? '';
+      final code = joined?['agencyCode']?.toString() ?? agency.code ?? '';
+      final joinedId = joined?['_id']?.toString() ?? agency.id;
+      final user = session.getUser();
+      if (user != null) {
+        session.saveUser(user.copyWith(
+          hostAgency: joinedId,
+          agencyCode: code.isNotEmpty ? code : null,
+        ));
+      }
+
+      _loadAgencies();
+      await _showWelcomeDialog(name, code);
+
+      if (mounted && widget.returnTo != null) {
+        context.pop(true); // caller resumes its flow with the joined code
       }
     } catch (e, s) {
       Log.e(_tag, 'joinAgency failed', e, s);
@@ -71,6 +95,62 @@ class _AgencyListScreenState extends State<AgencyListScreen> {
     } finally {
       if (mounted) setState(() => _joining = false);
     }
+  }
+
+  Future<void> _showWelcomeDialog(String name, String code) async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.celebration, color: AppTheme.primary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text('Welcome to ${name.isNotEmpty ? name : 'Agency'}'),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('You joined the agency successfully.'),
+            if (code.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.key, size: 18, color: AppTheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Agency Code: $code',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.primary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -114,7 +194,7 @@ class _AgencyListScreenState extends State<AgencyListScreen> {
                             ),
                             title: Text(agency.name ?? 'Unknown'),
                             subtitle: Text(
-                              '${agency.hostCount} hosts - Level ${agency.level}',
+                              '${agency.hostCount} hosts - Level ${agency.level}${(agency.code ?? '').isNotEmpty ? ' · Code ${agency.code}' : ''}',
                             ),
                             trailing: agency.isMember
                                 ? const Chip(label: Text('Joined'))
@@ -138,4 +218,3 @@ class _AgencyListScreenState extends State<AgencyListScreen> {
     );
   }
 }
-

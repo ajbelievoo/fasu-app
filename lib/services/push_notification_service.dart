@@ -646,9 +646,10 @@ class PushNotificationService {
       return;
     }
 
-    final type = (data['type'] as String? ?? '').toUpperCase();
+    final type = (data['actionType'] as String? ?? data['type'] as String? ?? '')
+        .toUpperCase();
     final dataStr =
-        data['data'] as String? ?? data['userId'] as String? ?? '';
+        data['data'] as String? ?? data['actionData'] as String? ?? data['userId'] as String? ?? '';
 
     Log.d('PushNotification',
         '[TAP] type=$type, dataStr="$dataStr", data.keys=${data.keys.toList()}');
@@ -773,12 +774,27 @@ class PushNotificationService {
       case Const.notificationFriendLevelUp:
         pushOnHome(AppRoutes.cp);
         break;
+      case Const.notificationFamily:
+        pushOnHome(AppRoutes.family);
+        break;
+      case Const.notificationHostRequest:
+        pushOnHome(AppRoutes.hostRequestStatus);
+        break;
+      case Const.notificationSubscription:
+        pushOnHome(AppRoutes.userSubscription);
+        break;
+      case Const.notificationRedeem:
+        pushOnHome(AppRoutes.redeemRequests);
+        break;
       case Const.notificationSystem:
       case Const.notificationReferral:
       case Const.notificationLevelUp:
       case Const.notificationVip:
+      case Const.notificationAnnouncement:
       default:
-        router.goNamed(AppRoutes.main);
+        // Unknown/announcement types land on the activity center so the
+        // tap always surfaces the notification that was clicked.
+        pushOnHome(AppRoutes.activityCenter);
         break;
     }
   }

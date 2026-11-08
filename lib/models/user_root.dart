@@ -79,6 +79,8 @@ class User {
     this.isVIP = false,
     this.isVerified = false,
     this.isHost = false,
+    this.hostAgency,
+    this.agencyCode,
     this.isCoinSeller = false,
     this.isAgency = false,
     this.isBd = false,
@@ -190,6 +192,8 @@ class User {
   final bool isVIP;
   final bool isVerified;
   final bool isHost;
+  final String? hostAgency;
+  final String? agencyCode;
   final bool isCoinSeller;
   final bool isAgency;
   final bool isBd;
@@ -352,6 +356,8 @@ class User {
               parseBool((json['vipDetails'] as Map)['isActive'])),
       isVerified: parseBool(json['isVerified']),
       isHost: parseBool(json['isHost']),
+      hostAgency: parseString(json['hostAgency']),
+      agencyCode: parseString(json['agencyCode']),
       isCoinSeller: parseBool(json['isCoinSeller']),
       isAgency: parseBool(json['isAgency']),
       isBd: parseBool(json['isBd']),
@@ -615,6 +621,8 @@ class User {
     'isVIP': isVIP,
     'isVerified': isVerified,
     'isHost': isHost,
+    'hostAgency': hostAgency,
+    'agencyCode': agencyCode,
     'isCoinSeller': isCoinSeller,
     'isAgency': isAgency,
     'isBd': isBd,
@@ -705,6 +713,9 @@ class User {
     bool? isPhoneBound,
     bool? isOfficialManager,
     bool? isRegionHead,
+    bool? isHost,
+    String? hostAgency,
+    String? agencyCode,
     num? coin,
     num? diamond,
     int? rCoin,
@@ -754,7 +765,9 @@ class User {
       referralCount: referralCount,
       isVIP: isVIP,
       isVerified: isVerified,
-      isHost: isHost,
+      isHost: isHost ?? this.isHost,
+      hostAgency: hostAgency ?? this.hostAgency,
+      agencyCode: agencyCode ?? this.agencyCode,
       isCoinSeller: isCoinSeller,
       isAgency: isAgency,
       isBd: isBd,

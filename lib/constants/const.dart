@@ -158,6 +158,11 @@ class Const {
   static const String notificationLevelUp = 'LEVELUP';
   static const String notificationVip = 'VIP';
   static const String notificationKyc = 'KYC';
+  static const String notificationFamily = 'FAMILY';
+  static const String notificationHostRequest = 'HOSTREQUEST';
+  static const String notificationSubscription = 'SUBSCRIPTION';
+  static const String notificationAnnouncement = 'ANNOUNCEMENT';
+  static const String notificationRedeem = 'REDEEM';
 
   // ---- Socket events (match native Const.EVENT_*) ------------------------
   // Chat

@@ -35,6 +35,8 @@ class Setting {
     this.latestVersionCode = 0,
     this.minVersionCode = 0,
     this.forceUpdate = false,
+    this.hostRequestAutoApprove = false,
+    this.withdrawalToReseller = false,
     this.updateUrl,
     this.updateMessage,
     this.apkFileLink,
@@ -95,6 +97,8 @@ class Setting {
   final int latestVersionCode;
   final int minVersionCode;
   final bool forceUpdate;
+  final bool hostRequestAutoApprove;
+  final bool withdrawalToReseller;
   final String? updateUrl;
   final String? updateMessage;
   final String? apkFileLink;
@@ -185,6 +189,8 @@ class Setting {
       latestVersionCode: parseInt(json['version'] ?? json['latestVersionCode']),
       minVersionCode: parseInt(json['minVersionCode']),
       forceUpdate: parseBool(json['forceUpdate']),
+      hostRequestAutoApprove: parseBool(json['hostRequestAutoApprove']),
+      withdrawalToReseller: parseBool(json['withdrawalToReseller']),
       updateUrl: parseString(json['updateUrl']),
       updateMessage: parseString(json['updateMessage']),
       apkFileLink: parseString(json['apkFileLink']),
@@ -310,6 +316,8 @@ class Setting {
     'version': latestVersionCode,
     'minVersionCode': minVersionCode,
     'forceUpdate': forceUpdate,
+    'hostRequestAutoApprove': hostRequestAutoApprove,
+    'withdrawalToReseller': withdrawalToReseller,
     'updateUrl': updateUrl,
     'updateMessage': updateMessage,
     'apkFileLink': apkFileLink,

@@ -671,7 +671,8 @@ class AppRoutes {
         );
       }),
       _named(agency, (_) => const AgencyDashboardScreen()),
-      _named(agencyList, (_) => const AgencyListScreen()),
+      _named(agencyList, (state) => AgencyListScreen(
+          returnTo: state.extra is String ? state.extra as String : null)),
       _named(agencyDetail, (_) => const AgencyListScreen()),
       _named(agencyDashboard, (_) => const AgencyDashboardScreen()),
       _named(agencyCreate, (_) => const CreateAgencyScreen()),

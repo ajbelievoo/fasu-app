@@ -190,7 +190,9 @@ class FcmService {
   void _handleMessageOpenedApp(RemoteMessage message) {
     Log.d(_tag, 'onMessageOpenedApp: ${message.data}');
     final data = message.data;
-    final type = (data['type'] as String? ?? '').toUpperCase();
+    // actionType is the routing-intended key (falls back to type).
+    final type = (data['actionType'] as String? ?? data['type'] as String? ?? '')
+        .toUpperCase();
 
     // The FCM `data` field is a JSON-encoded string whose contents depend on
     // the notification type (matches native FirebaseMessage.java):
@@ -304,8 +306,23 @@ class FcmService {
       case Const.notificationFriendLevelUp:
         pushOnHome(AppRoutes.cp);
         break;
+      case Const.notificationFamily:
+        pushOnHome(AppRoutes.family);
+        break;
+      case Const.notificationHostRequest:
+        pushOnHome(AppRoutes.hostRequestStatus);
+        break;
+      case Const.notificationSubscription:
+        pushOnHome(AppRoutes.userSubscription);
+        break;
+      case Const.notificationRedeem:
+        pushOnHome(AppRoutes.redeemRequests);
+        break;
+      case Const.notificationAnnouncement:
       default:
-        router.goNamed(AppRoutes.main);
+        // Unknown/announcement types land on the activity center so the
+        // tap always surfaces the notification that was clicked.
+        pushOnHome(AppRoutes.activityCenter);
         break;
     }
   }

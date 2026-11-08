@@ -248,6 +248,8 @@ class CoinSellerItem {
     this.image,
     this.countryCode,
     this.mobileNumber,
+    this.uniqueId = 0,
+    this.isTopSeller = false,
     this.coin = 0,
     this.spendCoin = 0,
     this.receiveCoin = 0,
@@ -260,6 +262,8 @@ class CoinSellerItem {
   final String? image;
   final String? countryCode;
   final String? mobileNumber;
+  final int uniqueId;
+  final bool isTopSeller;
   final double coin;
   final int spendCoin;
   final int receiveCoin;
@@ -272,6 +276,8 @@ class CoinSellerItem {
     image: parseString(json['image']),
     countryCode: parseString(json['countryCode']),
     mobileNumber: parseString(json['mobileNo'] ?? json['mobileNumber']),
+    uniqueId: parseInt(json['uniqueId'], 0),
+    isTopSeller: parseBool(json['isTopSeller']),
     coin: parseDouble(json['coin'], 0),
     spendCoin: parseInt(json['spendCoin'], 0),
     receiveCoin: parseInt(json['receiveCoin'], 0),

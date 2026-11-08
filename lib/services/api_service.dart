@@ -1746,12 +1746,15 @@ class ApiService {
 
   /// Submits a redeem/withdrawal request.
   /// [accountDetails] is a structured map of payment-method-specific fields.
+  /// [coinSellerId] is required when the admin routes withdrawals through
+  /// resellers (Setting.withdrawalToReseller).
   static Future<RedeemRequestRoot> submitRedeem({
     required String userId,
     required int coin,
     required String paymentMethod,
     required String paymentMethodId,
     required Map<String, dynamic> accountDetails,
+    String? coinSellerId,
   }) async {
     final r = await _dio.post(
       '/redeem',
@@ -1763,6 +1766,8 @@ class ApiService {
         'paymentMethod': paymentMethod,
         'paymentMethodId': paymentMethodId,
         'accountDetails': accountDetails,
+        if (coinSellerId != null && coinSellerId.isNotEmpty)
+          'coinSellerId': coinSellerId,
       },
     );
     return RedeemRequestRoot.fromJson(_asMap(r.data));

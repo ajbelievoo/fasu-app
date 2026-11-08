@@ -16,6 +16,7 @@ import '../../models/kyc_models.dart';
 import '../../models/redeem_calculation_model.dart';
 import '../../models/redeem_payment_method_model.dart';
 import '../../models/redeem_request_root.dart';
+import '../../models/store_models.dart';
 import '../../models/transaction_models.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/kyc_provider.dart';
@@ -62,6 +63,12 @@ class _CashOutScreenState extends State<CashOutScreen> {
   bool _kycBlocked = false;
   String? _kycBlockMessage;
 
+  // Reseller routing — when Setting.withdrawalToReseller is on, the user
+  // picks which reseller (coin seller) settles this withdrawal.
+  bool _resellerMode = false;
+  List<CoinSellerItem> _resellers = [];
+  CoinSellerItem? _selectedReseller;
+
   @override
   void initState() {
     super.initState();
@@ -98,6 +105,12 @@ class _CashOutScreenState extends State<CashOutScreen> {
         _loadPaymentMethods(session.userId),
         _loadHistory(session.userId),
       ]);
+
+      // Reseller-routed withdrawals need the seller list for the picker.
+      _resellerMode = setting?.withdrawalToReseller ?? false;
+      if (_resellerMode) {
+        _resellers = (await ApiService.getCoinSellers(session.userId)).coinSeller;
+      }
 
       // KYC pre-check.
       final check = await kyc.canWithdraw(session.userId);
@@ -396,6 +409,11 @@ class _CashOutScreenState extends State<CashOutScreen> {
     final details = _validateAndBuildDetails();
     if (details == null) return;
 
+    if (_resellerMode && _selectedReseller == null) {
+      Fluttertoast.showToast(msg: 'Please select a reseller for this withdrawal');
+      return;
+    }
+
     final session = context.read<SessionManager>();
     final auth = context.read<AuthProvider>();
     final coin = int.parse(_amountCtrl.text.trim());
@@ -409,6 +427,7 @@ class _CashOutScreenState extends State<CashOutScreen> {
         paymentMethod: _selectedMethod?.name ?? 'Bank Transfer',
         paymentMethodId: _selectedMethod?.id ?? 'bank_transfer',
         accountDetails: details,
+        coinSellerId: _resellerMode ? _selectedReseller?.id : null,
       );
       if (res.status) {
         Fluttertoast.showToast(msg: res.message ?? 'Redeem request submitted');
@@ -475,6 +494,10 @@ class _CashOutScreenState extends State<CashOutScreen> {
           _buildMethodSelector(),
           const SizedBox(height: 16),
           _buildPaymentFields(),
+          if (_resellerMode) ...[
+            const SizedBox(height: 16),
+            _buildResellerPicker(),
+          ],
           const SizedBox(height: 20),
           _buildSubmitButton(),
           const SizedBox(height: 24),
@@ -804,6 +827,51 @@ class _CashOutScreenState extends State<CashOutScreen> {
     return TextButton(
       onPressed: () => _verifyUpi(key),
       child: const Text('Verify', style: TextStyle(color: AppTheme.primary)),
+    );
+  }
+
+  /// Reseller picker shown when Setting.withdrawalToReseller routes
+  /// withdrawals through coin sellers. The chosen reseller receives the
+  /// request and settles the payout; on approve the beans move to them.
+  Widget _buildResellerPicker() {
+    if (_resellers.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+        ),
+        child: const Text(
+          'No resellers available in your region right now. Please try again later.',
+          style: TextStyle(fontSize: 13),
+        ),
+      );
+    }
+    return DropdownButtonFormField<String>(
+      value: _selectedReseller?.id,
+      decoration: InputDecoration(
+        labelText: 'Select Reseller',
+        prefixIcon: const Icon(Icons.storefront),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      isExpanded: true,
+      items: _resellers.map((r) {
+        final name = r.name ?? 'Reseller';
+        final uid = r.uniqueId != 0 ? ' · ${r.uniqueId}' : '';
+        final top = r.isTopSeller ? ' ★' : '';
+        return DropdownMenuItem<String>(
+          value: r.id,
+          child: Text('$name$uid$top', overflow: TextOverflow.ellipsis),
+        );
+      }).toList(),
+      onChanged: (id) => setState(() {
+        for (final r in _resellers) {
+          if (r.id == id) _selectedReseller = r;
+        }
+      }),
+      validator: (v) =>
+          _resellerMode && v == null ? 'Please select a reseller' : null,
     );
   }
 
