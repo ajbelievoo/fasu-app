@@ -318,6 +318,30 @@ class FcmService {
       case Const.notificationRedeem:
         pushOnHome(AppRoutes.redeemRequests);
         break;
+      case 'SELLER_FEEDBACK':
+        // Diamond purchase feedback invite — actionData carries the code.
+        final code = (data['actionData'] as String? ??
+                parsedData?['code'] as String? ??
+                '')
+            .toUpperCase();
+        pushOnHome(AppRoutes.sellerFeedback, extra: {
+          'code': code,
+          'sellerId': parsedData?['sellerId'] as String? ?? '',
+        });
+        break;
+      case 'SELLER_SALE':
+      case 'SELLER_FEEDBACK_RECEIVED':
+        // Seller-side events → Offline Recharge (Feedback tab lives there).
+        pushOnHome(AppRoutes.sellerRecharge);
+        break;
+      case 'SELLER_THANKS':
+        // Thank-you lands on the seller list (context of the purchase).
+        pushOnHome(AppRoutes.coinSellers);
+        break;
+      case 'SELLER':
+        // Generic seller event → diamond sellers page.
+        pushOnHome(AppRoutes.coinSellers);
+        break;
       case Const.notificationAnnouncement:
       default:
         // Unknown/announcement types land on the activity center so the

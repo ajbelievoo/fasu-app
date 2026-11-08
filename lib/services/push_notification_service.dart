@@ -786,6 +786,24 @@ class PushNotificationService {
       case Const.notificationRedeem:
         pushOnHome(AppRoutes.redeemRequests);
         break;
+      case 'SELLER_FEEDBACK':
+        // Feedback invite — code arrives inside the parsed `data` payload
+        // (or as the raw actionData fallback).
+        final code =
+            (parsedData?['code'] as String? ?? data).toUpperCase();
+        pushOnHome(AppRoutes.sellerFeedback, extra: {
+          'code': code,
+          'sellerId': parsedData?['sellerId'] as String? ?? '',
+        });
+        break;
+      case 'SELLER_SALE':
+      case 'SELLER_FEEDBACK_RECEIVED':
+        pushOnHome(AppRoutes.sellerRecharge);
+        break;
+      case 'SELLER_THANKS':
+      case 'SELLER':
+        pushOnHome(AppRoutes.coinSellers);
+        break;
       case Const.notificationSystem:
       case Const.notificationReferral:
       case Const.notificationLevelUp:

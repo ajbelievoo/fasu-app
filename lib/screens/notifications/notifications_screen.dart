@@ -196,6 +196,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'tournament':
       case 'leaderboard':
         return 'tournament';
+      case 'seller_feedback':
+      case 'seller_sale':
+      case 'seller_thanks':
+      case 'seller_feedback_received':
+      case 'seller':
+        return raw;
     }
 
     // Fallback: inspect title / message for obvious keywords.
@@ -444,6 +450,8 @@ class _NotificationTile extends StatelessWidget {
         return Icons.diamond_outlined;
       case Const.notificationKyc:
         return Icons.verified_user_outlined;
+      case 'SELLER':
+        return Icons.diamond;
       default:
         return Icons.notifications;
     }

@@ -251,6 +251,7 @@ class CoinSellerItem {
     this.uniqueId = 0,
     this.isTopSeller = false,
     this.rating = 0,
+    this.ratingCount = 0,
     this.coin = 0,
     this.spendCoin = 0,
     this.receiveCoin = 0,
@@ -266,6 +267,7 @@ class CoinSellerItem {
   final int uniqueId;
   final bool isTopSeller;
   final double rating;
+  final int ratingCount;
   final double coin;
   final int spendCoin;
   final int receiveCoin;
@@ -281,6 +283,7 @@ class CoinSellerItem {
     uniqueId: parseInt(json['uniqueId'], 0),
     isTopSeller: parseBool(json['isTopSeller']),
     rating: parseDouble(json['rating'], 0),
+    ratingCount: parseInt(json['ratingCount'], 0),
     coin: parseDouble(json['coin'], 0),
     spendCoin: parseInt(json['spendCoin'], 0),
     receiveCoin: parseInt(json['receiveCoin'], 0),
@@ -470,4 +473,139 @@ class CoinSellerHistoryItem {
       ),
     );
   }
+}
+
+// ─────────────────────── Seller feedback ───────────────────────
+
+/// A pending feedback invite created after a diamond purchase from a seller.
+class SellerFeedbackInvite {
+  SellerFeedbackInvite({
+    this.id,
+    this.code,
+    this.sellerId,
+    this.coin = 0,
+    this.createdAt,
+    this.expiresAt,
+  });
+
+  final String? id;
+  final String? code;
+  final String? sellerId;
+  final double coin;
+  final String? createdAt;
+  final String? expiresAt;
+
+  factory SellerFeedbackInvite.fromJson(Map<String, dynamic> json) =>
+      SellerFeedbackInvite(
+        id: parseString(json['_id'] ?? json['id']),
+        code: parseString(json['code']),
+        sellerId: parseString(json['seller'] ?? json['sellerId']),
+        coin: parseDouble(json['coin'], 0),
+        createdAt: parseString(json['createdAt']),
+        expiresAt: parseString(json['expiresAt']),
+      );
+}
+
+class PendingFeedbackRoot {
+  PendingFeedbackRoot({this.status = false, this.invite});
+
+  final bool status;
+  final SellerFeedbackInvite? invite;
+
+  factory PendingFeedbackRoot.fromJson(Map<String, dynamic> json) =>
+      PendingFeedbackRoot(
+        status: parseBool(json['status']),
+        invite: json['pending'] == null
+            ? null
+            : SellerFeedbackInvite.fromJson(
+                json['pending'] as Map<String, dynamic>),
+      );
+}
+
+class VerifyFeedbackRoot {
+  VerifyFeedbackRoot({
+    this.status = false,
+    this.usable = false,
+    this.sellerId,
+    this.message,
+  });
+
+  final bool status;
+  final bool usable;
+  final String? sellerId;
+  final String? message;
+
+  factory VerifyFeedbackRoot.fromJson(Map<String, dynamic> json) =>
+      VerifyFeedbackRoot(
+        status: parseBool(json['status']),
+        usable: parseBool(json['usable']),
+        sellerId: parseString(json['sellerId']),
+        message: parseString(json['message']),
+      );
+}
+
+/// One feedback row as seen by the seller (or admin).
+class SellerFeedbackEntry {
+  SellerFeedbackEntry({
+    this.id,
+    this.rating = 0,
+    this.feedback,
+    this.coin = 0,
+    this.createdAt,
+    this.buyerName,
+    this.buyerUniqueId = 0,
+    this.buyerImage,
+  });
+
+  final String? id;
+  final int rating;
+  final String? feedback;
+  final double coin;
+  final String? createdAt;
+  final String? buyerName;
+  final int buyerUniqueId;
+  final String? buyerImage;
+
+  factory SellerFeedbackEntry.fromJson(Map<String, dynamic> json) {
+    final user = json['user'] is Map ? json['user'] as Map : const {};
+    return SellerFeedbackEntry(
+      id: parseString(json['_id'] ?? json['id']),
+      rating: parseInt(json['rating'], 0),
+      feedback: parseString(json['feedback']),
+      coin: parseDouble(json['coin'], 0),
+      createdAt: parseString(json['createdAt']),
+      buyerName: parseString(user['name']),
+      buyerUniqueId: parseInt(user['uniqueId'], 0),
+      buyerImage: parseString(user['image']),
+    );
+  }
+}
+
+class SellerFeedbackListRoot {
+  SellerFeedbackListRoot({
+    this.status = false,
+    this.total = 0,
+    this.avgRating = 0,
+    this.ratingCount = 0,
+    this.feedback = const [],
+    this.message,
+  });
+
+  final bool status;
+  final int total;
+  final double avgRating;
+  final int ratingCount;
+  final List<SellerFeedbackEntry> feedback;
+  final String? message;
+
+  factory SellerFeedbackListRoot.fromJson(Map<String, dynamic> json) =>
+      SellerFeedbackListRoot(
+        status: parseBool(json['status']),
+        total: parseInt(json['total'], 0),
+        avgRating: parseDouble(json['avgRating'], 0),
+        ratingCount: parseInt(json['ratingCount'], 0),
+        feedback:
+            parseList(json['feedback'], SellerFeedbackEntry.fromJson),
+        message: parseString(json['message']),
+      );
 }

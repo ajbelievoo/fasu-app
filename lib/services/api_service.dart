@@ -4365,6 +4365,49 @@ class ApiService {
     return CoinSellerHistoryRoot.fromJson(_asMap(r.data));
   }
 
+  // ---- Seller feedback ----------------------------------------------------
+  /// The current user's pending feedback invite (created on each purchase).
+  static Future<PendingFeedbackRoot> getPendingSellerFeedback() async {
+    final r = await _dio.get('/sellerFeedback/pending');
+    return PendingFeedbackRoot.fromJson(_asMap(r.data));
+  }
+
+  /// Verify a feedback code typed by the user before submitting.
+  static Future<VerifyFeedbackRoot> verifySellerFeedbackCode(
+    String code,
+  ) async {
+    final r = await _dio.get(
+      '/sellerFeedback/verify',
+      queryParameters: {'code': code},
+    );
+    return VerifyFeedbackRoot.fromJson(_asMap(r.data));
+  }
+
+  /// Submit rating + feedback for a purchase.
+  static Future<RestResponse> submitSellerFeedback({
+    required String sellerId,
+    required String code,
+    required int rating,
+    String feedback = '',
+  }) async {
+    final r = await _dio.post(
+      '/sellerFeedback/submit',
+      data: {
+        'sellerId': sellerId,
+        'code': code,
+        'rating': rating,
+        'feedback': feedback,
+      },
+    );
+    return RestResponse.fromJson(_asMap(r.data));
+  }
+
+  /// Feedback received on the caller's own seller account.
+  static Future<SellerFeedbackListRoot> getMySellerFeedback() async {
+    final r = await _dio.get('/sellerFeedback/my');
+    return SellerFeedbackListRoot.fromJson(_asMap(r.data));
+  }
+
   // ---- Transaction summary / filtered -------------------------------------
   /// Get transaction summary (totals by type + balances).
   static Future<TransactionSummaryRoot> getTransactionSummary(

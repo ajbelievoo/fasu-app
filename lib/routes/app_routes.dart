@@ -87,6 +87,7 @@ import '../screens/vip/vip_theme_gallery_screen.dart';
 import '../screens/vip/gifting_cashback_screen.dart';
 import '../screens/wallet/cashout_screen.dart' hide TransactionHistoryScreen;
 import '../screens/wallet/coin_seller_screen.dart';
+import '../screens/wallet/seller_feedback_screen.dart';
 import '../screens/wallet/free_coins_screen.dart';
 import '../screens/store/my_store_screen.dart';
 import '../screens/store/store_screen.dart';
@@ -235,6 +236,7 @@ class AppRoutes {
   static const String coinSeller = 'coinSeller';
   static const String coinSellers = 'coinSellers';
   static const String sellerRecharge = 'sellerRecharge';
+  static const String sellerFeedback = 'sellerFeedback';
   static const String offlineRecharge = 'offlineRecharge';
   static const String redeemRequests = 'redeemRequests';
   static const String freeCoins = 'freeCoins';
@@ -595,6 +597,19 @@ class AppRoutes {
       _named(coinSellers, (_) => const CoinSellerListScreen()),
       _named(sellerRecharge, (_) => const SellerRechargeScreen()),
       _named(offlineRecharge, (_) => const SellerRechargeScreen()),
+      _named(sellerFeedback, (s) {
+        // extra may be a raw code string (notification tap) or a map.
+        String? code;
+        String? sellerId;
+        if (s.extra is String) {
+          code = s.extra as String;
+        } else if (s.extra is Map) {
+          final m = s.extra as Map;
+          code = m['code']?.toString();
+          sellerId = m['sellerId']?.toString();
+        }
+        return SellerFeedbackScreen(code: code, sellerId: sellerId);
+      }),
       _named(redeemRequests, (_) => const RedeemRequestsScreen()),
       _named(freeCoins, (_) => const FreeCoinsScreen()),
       _named(transactionHistory, (_) => const TransactionHistoryScreen()),

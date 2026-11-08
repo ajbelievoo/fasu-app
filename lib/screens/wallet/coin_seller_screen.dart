@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../constants/const.dart';
 import '../../models/follow_models.dart';
+import '../../routes/app_routes.dart';
 import '../../models/store_models.dart';
 import '../../services/api_service.dart';
 import '../../services/session_manager.dart';
@@ -20,6 +21,7 @@ import '../../services/socket_service.dart';
 import '../../utils/format_utils.dart';
 import '../../utils/log.dart';
 import '../../widgets/user_avatar.dart';
+import 'seller_feedback_screen.dart';
 import 'package:belive/widgets/preloader.dart';
 
 /// Coin seller list screen â€” shows sellers with WhatsApp contact.
@@ -93,6 +95,26 @@ class _CoinSellerListScreenState extends State<CoinSellerListScreen> {
     Fluttertoast.showToast(msg: 'Could not open WhatsApp');
   }
 
+  Future<void> _openFeedback(CoinSellerItem seller) async {
+    // Grab the latest pending invite so the code pre-fills. If the invite is
+    // for a different seller, still open the screen — the user can type the
+    // code from their inbox message.
+    String? code;
+    try {
+      final res = await ApiService.getPendingSellerFeedback();
+      if (res.status && res.invite != null) {
+        code = res.invite!.code;
+      }
+    } catch (e, s) {
+      Log.e(_tag, 'pending feedback fetch failed', e, s);
+    }
+    if (!mounted) return;
+    Navigator.of(context).pushNamed(
+      AppRoutes.sellerFeedback,
+      arguments: {'code': code ?? '', 'sellerId': seller.id ?? ''},
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,6 +137,7 @@ class _CoinSellerListScreenState extends State<CoinSellerListScreen> {
                   itemBuilder: (_, i) => _SellerCard(
                     seller: _sellers[i],
                     onContact: () => _openWhatsApp(_sellers[i]),
+                    onRate: () => _openFeedback(_sellers[i]),
                   ),
                 ),
               ),
@@ -125,10 +148,15 @@ class _CoinSellerListScreenState extends State<CoinSellerListScreen> {
 /// Seller card — avatar, name, uniqueId, admin rating (stars), diamonds
 /// in stock, TOP SELLER badge, WhatsApp contact.
 class _SellerCard extends StatelessWidget {
-  const _SellerCard({required this.seller, required this.onContact});
+  const _SellerCard({
+    required this.seller,
+    required this.onContact,
+    required this.onRate,
+  });
 
   final CoinSellerItem seller;
   final VoidCallback onContact;
+  final VoidCallback onRate;
 
   @override
   Widget build(BuildContext context) {
@@ -255,6 +283,35 @@ class _SellerCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  InkWell(
+                    onTap: onRate,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.star_rate_rounded,
+                            size: 15,
+                            color: Color(0xFFFFB300),
+                          ),
+                          Text(
+                            'Rate',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade700,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -281,7 +338,7 @@ class _SellerRechargeScreenState extends State<SellerRechargeScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -300,6 +357,7 @@ class _SellerRechargeScreenState extends State<SellerRechargeScreen>
           tabs: const [
             Tab(icon: Icon(Icons.diamond), text: 'Recharge'),
             Tab(icon: Icon(Icons.history), text: 'History'),
+            Tab(icon: Icon(Icons.star_rate_rounded), text: 'Feedback'),
           ],
         ),
       ),
@@ -308,6 +366,7 @@ class _SellerRechargeScreenState extends State<SellerRechargeScreen>
         children: [
           _SellerRechargeTab(onTopUp: _refreshHistory),
           _SellerHistoryTab(key: _historyKey),
+          const SellerFeedbackInbox(),
         ],
       ),
     );

@@ -19,8 +19,14 @@ class NotificationRouter {
 
   /// Navigate from the full FCM/socket data payload.
   static void navigateFromPayload(BuildContext context, Map<String, dynamic> data) {
-    final type = (data['type'] as String? ?? '').toUpperCase();
-    final payload = data['data'] as String? ?? data['userId'] as String? ?? '';
+    final type = (data['actionType'] as String? ??
+            data['type'] as String? ??
+            '')
+        .toUpperCase();
+    final payload = data['data'] as String? ??
+        data['actionData'] as String? ??
+        data['userId'] as String? ??
+        '';
     final ctx = rootNavigatorKey.currentContext ?? context;
     navigate(ctx, type, payload, extraData: data);
   }
@@ -191,6 +197,22 @@ class NotificationRouter {
         // Call notifications are handled by the call service; if extra call
         // data is present we route to the incoming call screen.
         router.pushNamed(AppRoutes.incomingCall, extra: extraData);
+        break;
+      case 'seller_feedback':
+        // Feedback invite — actionData is the code; sellerId may be inside
+        // the decoded data payload.
+        router.pushNamed(AppRoutes.sellerFeedback, extra: {
+          'code': (extraData['code'] as String? ?? payload).toUpperCase(),
+          'sellerId': extraData['sellerId'] as String? ?? '',
+        });
+        break;
+      case 'seller_sale':
+      case 'seller_feedback_received':
+        router.pushNamed(AppRoutes.sellerRecharge);
+        break;
+      case 'seller_thanks':
+      case 'seller':
+        router.pushNamed(AppRoutes.coinSellers);
         break;
       default:
         Log.w(_tag, 'unhandled notification type: $type — falling back to main');
