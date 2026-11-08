@@ -1412,8 +1412,10 @@ class _LuckyIdTabState extends State<_LuckyIdTab>
       return;
     }
     try {
+      // Backend expects the LuckyId document _id — item.luckyId is the
+      // display number (e.g. "101010") which fails isValidObjectId → 404.
       final res = await ApiService.purchaseLuckyId(
-        luckyId: item.luckyId ?? '',
+        luckyId: item.id ?? '',
         userId: session.userId,
       );
       if (res.status) {

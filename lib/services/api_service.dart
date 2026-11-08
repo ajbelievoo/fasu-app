@@ -2682,6 +2682,18 @@ class ApiService {
     return RestResponse.fromJson(_asMap(r.data));
   }
 
+  /// Fetch the room's currently active lucky bag (or null) — lets a viewer
+  /// who opens the sheet after the create socket event still see and claim it.
+  static Future<RestResponse> getActiveLuckyBag({
+    required String roomId,
+  }) async {
+    final r = await _dio.get(
+      '/audioRoom/luckyBagActive',
+      queryParameters: {'liveStreamingId': roomId},
+    );
+    return RestResponse.fromJson(_asMap(r.data));
+  }
+
   static Future<RestResponse> getLuckyBagHistory({
     String? liveStreamingId,
     String? userId,

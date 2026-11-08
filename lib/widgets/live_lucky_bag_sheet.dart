@@ -129,6 +129,41 @@ class _LiveLuckyBagSheetState extends State<LiveLuckyBagSheet> {
     super.initState();
     if (!widget.isHost) {
       _listenForLuckyBag();
+      _fetchActiveBag();
+    }
+  }
+
+  /// Late-join path: a bag created BEFORE the sheet opened never fires the
+  /// socket listener — query the backend for the room's active bag instead.
+  Future<void> _fetchActiveBag() async {
+    try {
+      final res = await ApiService.getActiveLuckyBag(
+        roomId: widget.liveStreamingId,
+      );
+      if (!mounted || res.status != true) return;
+      final bag = _unwrap(res.data);
+      if (bag == null) return;
+      final hasClaimed = bag['hasClaimed'] == true;
+      setState(() {
+        _available = true;
+        _bagId = _string(bag, const ['bagId', 'luckyBagId', '_id', 'id']);
+        _senderName =
+            bag['senderName']?.toString() ??
+            bag['name']?.toString() ??
+            'Someone';
+        _senderImage = VideoUtil.getFullImageUrl(
+          bag['senderImage']?.toString() ?? bag['image']?.toString() ?? '',
+        );
+        _totalCoins = _integer(bag, const ['totalCoins', 'totalCoin']);
+        _bagCount = _integer(bag, const ['bagCount', 'winnerCount']);
+        _countdownSeconds = 0; // reveal already happened — claim is ready
+        if (hasClaimed) {
+          _claimed = true;
+          _resultCoins = _integer(bag, const ['myClaim', 'coin']);
+        }
+      });
+    } catch (e, s) {
+      Log.e(_tag, 'fetchActiveBag failed', e, s);
     }
   }
 
