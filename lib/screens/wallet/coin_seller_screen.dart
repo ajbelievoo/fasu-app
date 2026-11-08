@@ -110,28 +110,157 @@ class _CoinSellerListScreenState extends State<CoinSellerListScreen> {
               : RefreshIndicator(
                 onRefresh: _load,
                 child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   itemCount: _sellers.length,
-                  itemBuilder: (_, i) {
-                    final s = _sellers[i];
-                    return ListTile(
-                      leading: UserAvatar(imageUrl: s.image, size: 48),
-                      title: Text(
-                        s.name ?? 'Seller',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: Text(
-                        '${formatCount(s.coin.toInt())} diamonds available',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.chat, color: Colors.green),
-                        onPressed: () => _openWhatsApp(s),
-                      ),
-                      onTap: () => _openWhatsApp(s),
-                    );
-                  },
+                  itemBuilder: (_, i) => _SellerCard(
+                    seller: _sellers[i],
+                    onContact: () => _openWhatsApp(_sellers[i]),
+                  ),
                 ),
               ),
+    );
+  }
+}
+
+/// Seller card — avatar, name, uniqueId, admin rating (stars), diamonds
+/// in stock, TOP SELLER badge, WhatsApp contact.
+class _SellerCard extends StatelessWidget {
+  const _SellerCard({required this.seller, required this.onContact});
+
+  final CoinSellerItem seller;
+  final VoidCallback onContact;
+
+  @override
+  Widget build(BuildContext context) {
+    final rating = seller.rating.clamp(0, 5);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onContact,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              UserAvatar(imageUrl: seller.image, size: 52),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            seller.name ?? 'Seller',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                            ),
+                          ),
+                        ),
+                        if (seller.isTopSeller) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFFFB300), Color(0xFFFF6F00)],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'TOP',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        for (var i = 1; i <= 5; i++)
+                          Icon(
+                            i <= rating.floor()
+                                ? Icons.star_rounded
+                                : (i - rating < 1
+                                    ? Icons.star_half_rounded
+                                    : Icons.star_border_rounded),
+                            size: 15,
+                            color: const Color(0xFFFFB300),
+                          ),
+                        const SizedBox(width: 5),
+                        Text(
+                          rating.toStringAsFixed(1),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (seller.uniqueId != 0) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            'ID: ${seller.uniqueId}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${formatCount(seller.coin.toInt())} diamonds available',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
+                      onPressed: onContact,
+                      tooltip: 'Contact seller',
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Buy',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

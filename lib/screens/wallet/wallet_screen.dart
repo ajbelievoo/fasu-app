@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/wallet_models.dart';
 import '../../providers/auth_provider.dart';
@@ -82,54 +81,29 @@ class _WalletScreenState extends State<WalletScreen> {
   }
 
   Future<void> _openOfflineRecharge() async {
-    const url = 'https://we.believoo.com/';
+    // Native diamond-seller list replaced the old we.believoo.com WebView —
+    // same data (GET /coinSeller), faster and admin-controlled via showInApp.
     final results = await Connectivity().checkConnectivity();
     if (results.contains(ConnectivityResult.none)) {
-      if (mounted) _showNoInternetDialog(url);
+      if (mounted) _showNoInternetDialog();
       return;
     }
     if (mounted) {
-      context.pushNamed(
-        AppRoutes.webView,
-        extra: {'url': url, 'title': 'Offline Recharge'},
-      );
+      context.pushNamed(AppRoutes.coinSellers);
     }
   }
 
-  void _showNoInternetDialog(String url) {
+  void _showNoInternetDialog() {
     showDialog(
       context: context,
       builder:
           (ctx) => AlertDialog(
             title: const Text('No Internet'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Please check your internet connection.'),
-                const SizedBox(height: 8),
-                SelectableText(
-                  url,
-                  style: const TextStyle(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+            content: const Text('Please check your internet connection.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('OK'),
-              ),
-              TextButton(
-                onPressed: () async {
-                  final uri = Uri.parse(url);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                child: const Text('Open'),
               ),
             ],
           ),
