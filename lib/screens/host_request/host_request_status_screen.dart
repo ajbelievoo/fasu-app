@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../constants/const.dart';
 import '../../routes/app_routes.dart';
 import '../../services/api_service.dart';
 import '../../services/session_manager.dart';
+import '../../services/socket_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/log.dart';
 import '../../widgets/premium_ui.dart';
@@ -32,11 +34,24 @@ class _HostRequestStatusScreenState extends State<HostRequestStatusScreen> {
   String? _createdAt;
   String? _rejectionReason;
   String? _error;
+  void Function()? _profileRefreshUnsub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Admin/agency approve-decline emits userProfileRefresh to this user's
+    // room — reload so pending → approved/rejected flips without re-login.
+    _profileRefreshUnsub = SocketService.instance.on(
+      Const.eventUserProfileRefresh,
+      (_) => _load(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _profileRefreshUnsub?.call();
+    super.dispose();
   }
 
   Future<void> _load() async {

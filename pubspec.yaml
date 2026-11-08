@@ -88,7 +88,7 @@ dependencies:
   agora_token_generator: ^1.0.0
 
   # Utilities
-  intl: 0.20.2
+  intl: ^0.20.3
 
   # SVGA animations — svgaplayer_3 is the maintained fork of the archived
   # svgaplayer_flutter package and fixes transparent-background / alpha issues.
