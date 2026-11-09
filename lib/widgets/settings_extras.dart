@@ -91,7 +91,17 @@ Future<void> ensurePasswordSet(BuildContext context) async {
   final session = context.read<SessionManager>();
   final userId = session.userId;
   if (userId.isEmpty) return;
-  if (await ApiService.hasPassword(userId)) return;
+
+  // Ask once per account per device — after the prompt has been handled
+  // (password set or skipped) it never appears again on this device.
+  final prefs = await SharedPreferences.getInstance();
+  final flagKey = 'password_setup_done_$userId';
+  if (prefs.getBool(flagKey) == true) return;
+
+  if (await ApiService.hasPassword(userId)) {
+    await prefs.setBool(flagKey, true);
+    return;
+  }
   if (!context.mounted) return;
 
   final newCtrl = TextEditingController();
@@ -153,6 +163,7 @@ Future<void> ensurePasswordSet(BuildContext context) async {
                     newPassword: newCtrl.text,
                   );
                   if (res.status == true) {
+                    await prefs.setBool(flagKey, true);
                     if (ctx.mounted) Navigator.pop(ctx);
                     Fluttertoast.showToast(msg: 'Password set successfully');
                   } else {
@@ -164,6 +175,13 @@ Future<void> ensurePasswordSet(BuildContext context) async {
               },
               child: const Text('Set Password'),
             ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await prefs.setBool(flagKey, true);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('Set Later', style: TextStyle(color: Colors.grey)),
           ),
         ],
       ),
